@@ -95,7 +95,7 @@ test("review is asynchronous, isolated, linked to persisted ID, and displayed be
   await h.user();
   assert.equal(h.calls.length, 1); // The main input handler returned despite an unfinished model call.
   const call = h.calls[0];
-  assert.equal(call.model.id, "gpt-6-luna");
+  assert.equal(call.model.id, "gpt-6-sol");
   assert.deepEqual(call.context.tools, []);
   assert.equal(call.context.messages.length, 1);
   assert.equal(JSON.parse(call.context.messages[0].content), "Anything needs adressing?");
@@ -336,7 +336,7 @@ test("bad output warns after settlement without logging fabricated corrections",
 });
 
 test("model command selects Sol and rejects unknown models", async (t) => {
-  const h = await setup(t);
+  const h = await setup(t, { model: "gpt-6-luna" });
   await h.command("model openai-codex/gpt-6-sol");
   await h.user();
   assert.equal(h.calls[0].model.id, "gpt-6-sol");

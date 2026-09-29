@@ -14,7 +14,7 @@ pi install /absolute/path/to/corrective-feedback
 Run `/reload` in an existing Pi session, or start a new one. Pi loads the root `index.ts`
 entry point, displaying the extension as `corrective-feedback` rather than `src`.
 The package has no additional runtime dependencies; Pi loads the TypeScript directly. Log into your chosen provider using
-Pi's `/login`. The default reviewer is **openai-codex/gpt-6-luna**; no separate API key is needed
+Pi's `/login`. The default reviewer is **openai-codex/gpt-6-sol**; no separate API key is needed
 when that model is available through your Codex subscription.
 
 To try without installing:
@@ -80,7 +80,7 @@ additional messages are skipped with a warning. Reviews have a configurable time
 |---|---|
 | `/feedback` or `/feedback status` | Show enabled state, model, config and log paths |
 | `/feedback on` / `/feedback off` | Enable/disable for this runtime; off cancels pending work |
-| `/feedback model openai-codex/gpt-6-sol` | Select another model from Pi's catalog |
+| `/feedback model openai-codex/gpt-6-luna` | Select another model from Pi's catalog |
 | `/feedback clear` | Clear the widget; does not delete logs or cancel pending work |
 | `/feedback last` | Redisplay the most recent corrections in this runtime |
 | `/feedback reload` | Reload configuration and cancel pending reviews |
@@ -101,7 +101,7 @@ Copy `config.example.json` to the configuration path and edit it:
 {
   "enabled": true,
   "provider": "openai-codex",
-  "model": "gpt-6-luna",
+  "model": "gpt-6-sol",
   "reasoning": "low",
   "includeSuggestions": false,
   "maxInputChars": 12000,
@@ -121,7 +121,7 @@ Default log: `~/.pi/agent/corrective-feedback/feedback.jsonl`.
 One line per successfully completed, valid review (including those with no corrections), with a schema version:
 
 ```json
-{"version":1,"id":"uuid","timestamp":"2026-09-28T00:00:00.000Z","sessionPath":"/path/to/session.jsonl","sessionId":"session-id","userMessageId":"entry-id","provider":"openai-codex","model":"gpt-6-luna","corrections":[{"kind":"error","original":"adressing","corrected":"addressing","category":"spelling","explanation":"Use a double d."}],"reviewerMessages":[{"role":"assistant","content":"{\"corrections\":[...]}"}],"usage":{},"durationMs":2000}
+{"version":1,"id":"uuid","timestamp":"2026-09-28T00:00:00.000Z","sessionPath":"/path/to/session.jsonl","sessionId":"session-id","userMessageId":"entry-id","provider":"openai-codex","model":"gpt-6-sol","corrections":[{"kind":"error","original":"adressing","corrected":"addressing","category":"spelling","explanation":"Use a double d."}],"reviewerMessages":[{"role":"assistant","content":"{\"corrections\":[...]}"}],"usage":{},"durationMs":2000}
 ```
 
 `reviewerMessages` contains the reviewer's full visible textual response, not reasoning,
@@ -161,8 +161,8 @@ and exclusion of headless/extension input. Tests mock model calls and consume no
 Optional live checks (consume a small amount of provider quota):
 
 ```sh
-npm run smoke                 # Luna: spelling error and preservation of “main thread”
-npm run smoke -- gpt-6-sol    # same checks with Sol
+npm run smoke                 # Sol: spelling error and preservation of “main thread”
+npm run smoke -- gpt-6-luna   # same checks with Luna
 python3 test/tui-smoke.py     # real Pi regular-mode TUI, widget + JSONL (Unix)
 ```
 

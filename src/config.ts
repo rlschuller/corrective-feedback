@@ -27,7 +27,7 @@ export function defaults(path = configPath()): Config {
   return {
     enabled: true,
     provider: "openai-codex",
-    model: "gpt-6-luna",
+    model: "gpt-6-sol",
     reasoning: "low",
     includeSuggestions: false,
     maxInputChars: 12000,

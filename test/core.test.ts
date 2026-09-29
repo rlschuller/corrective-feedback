@@ -14,7 +14,7 @@ test("config defaults, home/relative paths and strict validation", async () => {
   const path = "/tmp/feedback-test/config.json";
   assert.equal(defaults(path).logPath, "/tmp/feedback-test/corrective-feedback/feedback.jsonl");
   assert.equal(parseConfig({ logPath: "logs/out.jsonl" }, path).logPath, "/tmp/feedback-test/logs/out.jsonl");
-  assert.equal((await loadConfig("/nonexistent-feedback-dir/config.json")).model, "gpt-6-luna");
+  assert.equal((await loadConfig("/nonexistent-feedback-dir/config.json")).model, "gpt-6-sol");
   for (const value of [null, [], { enabled: "yes" }, { timeoutMs: 0 }, { maxInputChars: 2 }, { model: "" }, { reasoning: "huge" }, { typo: 1 }]) {
     assert.throws(() => parseConfig(value));
   }
