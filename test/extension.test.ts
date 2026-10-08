@@ -34,7 +34,9 @@ async function setup(t: TestContext, options: Record<string, unknown> = {}) {
     mode: "tui", hasUI: true,
     ui: {
       setWidget: (_key: string, value: string[] | undefined) => { widgets.push(value); },
-      setStatus: () => {}, notify: (text: string) => { notices.push(text); },
+      setStatus: () => assert.fail("Feedback must not add a footer status row"),
+      setFooter: () => assert.fail("Feedback must preserve the existing footer"),
+      notify: (text: string) => { notices.push(text); },
     },
     sessionManager: {
       getBranch: () => entries,
@@ -111,6 +113,27 @@ test("review is asynchronous, isolated, linked to persisted ID, and displayed be
   assert.equal(record.usage.totalTokens, 123);
   await h.emit("agent_settled");
   assert.match(h.widgets.at(-1)!.join("\n"), /addressing/);
+});
+
+test("pending and queued reviews add no UI rows before corrections arrive", async (t) => {
+  const h = await setup(t);
+  await h.user();
+  await h.user("This sentence is correct.", "interactive", false);
+  await h.emit("agent_settled");
+  assert.equal(h.calls.length, 1);
+  assert.equal(h.widgets.filter(Boolean).length, 0);
+  assert.equal(h.notices.length, 0);
+
+  h.calls[0].resolve(response([]));
+  await tick();
+  assert.equal(h.calls.length, 2);
+  assert.equal(h.widgets.filter(Boolean).length, 0);
+  assert.equal(h.notices.length, 0);
+
+  h.calls[1].resolve(response([]));
+  await tick();
+  assert.equal(h.widgets.filter(Boolean).length, 0);
+  assert.equal(h.notices.length, 0);
 });
 
 test("feedback is blue on automatic display and recall, but logs remain unstyled", async (t) => {

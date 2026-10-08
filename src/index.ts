@@ -39,7 +39,6 @@ export default function correctiveFeedback(pi: ExtensionAPI): void {
     feedbackVisible = false;
     if (ctx.mode !== "tui") return;
     ctx.ui.setWidget(WIDGET, undefined);
-    ctx.ui.setStatus(WIDGET, undefined);
   }
 
   function dismissFeedback(ctx: ExtensionContext): void {
@@ -80,7 +79,6 @@ export default function correctiveFeedback(pi: ExtensionAPI): void {
 
   function render(ctx: ExtensionContext): void {
     if (!enabled(ctx)) return;
-    ctx.ui.setStatus(WIDGET, active || queue.length ? "English: reviewing…" : undefined);
     if (completed.length) {
       // The compact widget shows the most recent feedback; all records remain in JSONL.
       const record = completed[completed.length - 1];

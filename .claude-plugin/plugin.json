@@ -1,0 +1,6 @@
+{
+  "name": "corrective-feedback",
+  "version": "0.1.0",
+  "description": "Private asynchronous English feedback, reviewed by GPT Sol through Pi.",
+  "author": { "name": "Corrective Feedback contributors" }
+}

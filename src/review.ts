@@ -19,19 +19,7 @@ Return ONLY JSON: {"corrections":[{"kind":"error","original":"exact contiguous e
 Each original must be copied exactly from the supplied prose. No Markdown fences, praise, overall assessment, full-message rewrite, or additional fields. Return {"corrections":[]} if nothing needs correcting.`;
 }
 
-/** Cheap exclusions before sending anything to a provider; not a general-purpose secret scrubber. */
-export function prepareText(text: string, maxChars: number): string | undefined {
-  if (!text.trim() || text.length > maxChars || /^[!/]/.test(text.trim())) return;
-  const prose = text
-    .replace(/^\s*(`{3,}|~{3,})[^\n]*\n[\s\S]*?^\s*\1[^\n]*(?:\n|$)/gm, "\n")
-    .replace(/`[^`\n]*`/g, " ")
-    .replace(/^\s*>.*$/gm, "")
-    .replace(/https?:\/\/\S+/g, " ")
-    .trim();
-  if (!/[a-zA-Z]{2}/.test(prose)) return;
-  if (/^(?:yes|no|ok(?:ay)?|thanks|thank you|sure|got it|hold on)[.!\s]*$/i.test(prose)) return;
-  return prose;
-}
+export { prepareText } from "./text.ts";
 
 /** Bound the queue even if a provider is slow to acknowledge cancellation. */
 export function withAbort<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {

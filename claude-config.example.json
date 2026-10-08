@@ -1,0 +1,11 @@
+{
+  "enabled": true,
+  "provider": "openai-codex",
+  "model": "gpt-6-sol",
+  "reasoning": "low",
+  "includeSuggestions": false,
+  "maxInputChars": 12000,
+  "maxOutputTokens": 1800,
+  "timeoutMs": 60000,
+  "logPath": "corrective-feedback/claude-feedback.jsonl"
+}

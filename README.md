@@ -1,8 +1,10 @@
-# Pi corrective feedback
+# Corrective feedback for Pi and Claude Code
 
-An installable Pi extension for selective English feedback, outside the main agent's context.
+Selective English feedback outside the main agent's context: a Pi extension and a Claude Code
+mod backed by Pi's model runtime. Both share the reviewer prompt, filtering, parsing, and
+private JSONL writer.
 
-## Install
+## Install in Pi
 
 Requires Node.js 22.19+ and a current Pi with `agent_settled` and `modelRegistry.streamSimple`
 (tested with `@earendil-works/pi-coding-agent` 0.87.1).
@@ -30,7 +32,86 @@ A git URL can also be installed with `pi install git:github.com/OWNER/REPOSITORY
 Remove with `pi remove /absolute/path/to/corrective-feedback`, followed by `/reload`.
 Removal does not delete your configuration or logs.
 
-## Behavior
+## Use in Claude Code
+
+Requires **Claude Code 2.1.295+**, **Node.js 22.19+** on `PATH`, and Pi's existing provider
+login (tested with Pi 0.87.1). The default Claude reviewer is **openai-codex/gpt-6-sol**.
+The Claude subscription is not used for reviews; Pi handles the selected provider's credentials,
+OAuth refresh, and quota. If Sol 6 works in Pi, no separate API key is needed here.
+
+Install the local worker's dependencies once, then load this checkout as a plugin:
+
+```sh
+cd /absolute/path/to/corrective-feedback
+npm ci --ignore-scripts
+claude --plugin-dir "$PWD"
+```
+
+To use it while working in another project, run
+`claude --plugin-dir /absolute/path/to/corrective-feedback` from that project. Accept Claude's
+workspace trust prompt when appropriate. Check `/plugin` for the active `corrective-feedback`
+mod, then use `/feedback status`. This does not install the mod globally or change Claude's
+settings. To stop loading it, omit `--plugin-dir` on your next invocation.
+
+### Claude behavior and commands
+
+The mod captures only interactive composer/Remote Control input, then waits for **both prompt
+acceptance and its persisted user row**. Blocked, unmatched, fully transformed, headless,
+subagent, and injected prompts are skipped. Each review runs in a separate local Node worker
+using Pi's `ModelRuntime.completeSimple`: one reviewer system prompt, one JSON-encoded prose
+message, no tools, coding-agent session, project instructions, or conversation history.
+
+Reviews run asynchronously and serially, with at most 16 waiting. Corrections appear in blue
+above the prompt even while Claude works, without replacing the spinner or another mod's
+band. Empty results stay silent but are logged. The band clears on the next main turn; the
+latest correction-bearing result remains available through `/feedback last`. Warnings wait
+until Claude's main turn ends. Reload, disable, session replacement, and shutdown invalidate
+pending work and close worker processes; deadlines release the queue even if cancellation is
+slow. A worker is also killed if the mod unloads.
+
+| Command | Effect |
+|---|---|
+| `/feedback` or `/feedback status` | Show state, model, config and log paths |
+| `/feedback on` / `/feedback off` | Enable/disable for this runtime; off cancels pending reviews |
+| `/feedback clear` | Hide corrections without deleting logs or cancelling work |
+| `/feedback last` | Redisplay the latest corrections in this runtime |
+| `/feedback model openai-codex/gpt-6-sol` | Validate/select a model from Pi's catalog |
+| `/feedback reload` | Cancel pending work and reload configuration |
+
+Command changes are temporary. There is no Ctrl+H binding in Claude; use `clear` and `last`.
+Feedback, warnings, and command status never become Claude messages: drawing uses `ui.render`,
+not prompt submission; command handlers return `{}`, not context-bearing text. History is
+not replayed on resume/reload. Automatic review requires an interactive terminal or Desktop
+surface; the VS Code chat panel and headless jobs are not reviewed.
+
+### Claude configuration and privacy
+
+Optional configuration: **`~/.pi/agent/claude-corrective-feedback.json`**. Copy
+`claude-config.example.json` there to customize it. Its schema is the same as the Pi config
+below, including the default model `gpt-6-sol`, but its default log is
+**`~/.pi/agent/corrective-feedback/claude-feedback.jsonl`**. Pi's existing configuration and
+default reviewer are unchanged.
+
+- `PI_CODING_AGENT_DIR` selects Pi's credentials/catalog directory and the default config directory.
+- `CLAUDE_CORRECTIVE_FEEDBACK_CONFIG` selects a different Claude feedback config file.
+- `CLAUDE_CORRECTIVE_FEEDBACK_NODE` selects the worker's Node executable, if it is not on `PATH`.
+
+Workers reread configuration for each request. `/feedback reload` also resets command overrides
+and refreshes the mod's cached input limit, deadline, and displayed status. Invalid config,
+unavailable models, or missing Pi authentication fail closed; the main Claude session still
+works, and there is no silent fallback to another model.
+
+Claude JSONL records use the schema below with `host: "claude-code"`, Claude's session ID,
+transcript path, and the actual user-row UUID. Prompts travel over worker stdin, not command
+arguments. The full original prompt is not duplicated in feedback logs. Logs are created with
+the same 0700 directory/0600 file permissions as Pi's logs. The same privacy caveats apply:
+your prose is sent separately to the reviewer provider, consumes its quota, and corrections
+can contain sensitive excerpts. Use `/feedback off` before submitting sensitive prose.
+
+Claude Code's [mods documentation](https://code.claude.com/docs/en/plugins/mods/overview)
+describes plugin loading and supported surfaces.
+
+## Behavior (Pi)
 
 1. Capture only original interactive user input, not assistant replies, tool results, images,
    extension-injected prompts, project instructions, or conversation history.
@@ -39,7 +120,8 @@ Removal does not delete your configuration or logs.
 3. Make an independent, tool-free model request containing a small reviewer system prompt and
    a JSON-encoded copy of the submitted prose. This is **not** a child coding-agent session:
    no default coding prompt, AGENTS.md, skills, tools, or Pi-subagents dependency.
-4. Run reviews asynchronously, one at a time, while the main agent works.
+4. Run reviews asynchronously, one at a time, while the main agent works. Pending reviews
+   stay silent: no “English: reviewing…” status row or replacement of Pi's footer.
 5. Show corrections as soon as the review finishes, even while the main answer is running,
    in a bright-blue widget above the editor (including `/feedback last` recalls). It never
    makes the main agent wait or starts another turn. Warnings wait until the main run settles.
@@ -150,7 +232,21 @@ are not necessarily additional subscription charges.
 
 ```sh
 npm ci --ignore-scripts
-npm run check
+npm run check                 # Pi + worker tests and Node type checking
+npm run claude:check          # Claude's native validator/test kit; no model calls
+python3 test/claude-tui-smoke.py # real Unix Claude TUI, both model paths stubbed
+```
+
+After loading the mod once in an interactive `claude --plugin-dir` session, Claude writes its
+version-specific type declarations into ignored `.claude-plugin/types/`. Run
+`npm run claude:typecheck` to check the mod against those exact declarations.
+`claude:check` stages only the Claude test files, because Claude's recursive test runner cannot
+run this repository's existing Node/Pi tests. The TUI smoke uses a generated temporary workspace
+and trusts only that workspace; it submits one synthetic prompt, removes its transcript, and
+makes no model calls. Real worker status/authentication can be checked without model quota:
+
+```sh
+printf '%s' '{"action":"status"}' | node --experimental-strip-types src/claude-worker.ts
 ```
 
 Tests cover parsing, filtering, private JSONL, source attribution, non-blocking lifecycle,

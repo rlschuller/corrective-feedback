@@ -4,6 +4,8 @@ import type { Correction } from "./review.ts";
 
 export interface FeedbackRecord {
   version: 1;
+  /** Absent on existing Pi records. */
+  host?: "claude-code";
   id: string;
   timestamp: string;
   sessionPath: string | null;
