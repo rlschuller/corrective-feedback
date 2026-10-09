@@ -228,6 +228,41 @@ usage and estimated costs even when no corrections result. Failed, cancelled, or
 reviews are not logged, so the log is not a complete billing ledger. Provider dollar estimates
 are not necessarily additional subscription charges.
 
+## Update the time-series plot
+
+From this checkout, run:
+
+```sh
+./update-plot.sh
+# Or: npm run plot
+```
+
+Requires **Python 3.9+ with Matplotlib** and **Node.js 22.19+**. The updater reads Pi's and
+Claude's configured feedback logs, finds each persisted user message by its ID, and applies
+the shared prose filter. It makes no model calls and exports only aggregate data. Keep the
+linked session transcripts: reviews with missing/unrecoverable text are excluded from both
+the error count and character denominator, and the command reports exclusions.
+
+The daily and overall rates are `1,000 × errors / reviewed characters`, counting Unicode
+code points (including spaces/newlines), including zero-error reviews and excluding suggestions.
+Outputs are `plots/daily-errors-per-1000-characters.{png,svg,csv}`. Each run replaces those
+three files with a fresh snapshot; the latest day may be incomplete. Dates default to
+`America/Sao_Paulo`. CSV rows also retain separate Pi/Claude counts.
+
+Optional overrides:
+
+```sh
+npm run plot -- --timezone UTC --output-dir /path/to/output
+npm run plot -- --pi-log /path/to/pi.jsonl --claude-log /path/to/claude.jsonl
+```
+
+You can also run `/path/to/corrective-feedback/update-plot.sh` from any directory.
+The Bash script forwards all options to the Python updater, for example:
+
+```sh
+./update-plot.sh --timezone UTC --output-dir /path/to/output
+```
+
 ## Development and verification
 
 ```sh
