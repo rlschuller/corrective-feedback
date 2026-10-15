@@ -4,9 +4,7 @@ English corrections alongside your coding agent—not in its conversation.
 Feedback appears in blue while the agent keeps working, without editing your prompt
 or adding corrections to the main model's context.
 
-![Illustrated Pi and Claude Code workflow: a spelling correction appears while the agent responds; Ctrl+N hides and recalls it without changing the draft.](docs/assets/demo.gif)
-
-*Illustration with synthetic text, not a terminal recording. [Static preview](docs/assets/demo.png).*
+![A spelling correction appears in Pi and Claude Code while the agent responds; Ctrl+N hides and recalls it.](docs/assets/demo.gif)
 
 ## Quick start
 

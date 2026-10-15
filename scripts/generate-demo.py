@@ -1,4 +1,4 @@
-"""Render an illustrative README demo. Synthetic text only; no host/model calls.
+"""Render the README demo GIF. Synthetic text only; no host/model calls.
 
 Requires Pillow and DejaVu Sans Mono (regular and bold). Run from any directory.
 """
@@ -8,7 +8,7 @@ from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 
 ROOT = Path(__file__).resolve().parents[1]
-WIDTH, HEIGHT = 1120, 590
+WIDTH, HEIGHT = 1120, 387
 BG = "#0c1220"
 PANEL = "#131d2e"
 BORDER = "#2b3a52"
@@ -19,14 +19,6 @@ PROMPT = "Please fix teh failing test."
 DRAFT = "Also check the edge cases."
 ANSWER = "I'll inspect the failing test."
 FOLLOWUP = "Then I'll check the assertion."
-CAPTIONS = (
-    "Write naturally. Keep your coding workflow.",
-    "Your agent responds. English feedback runs separately.",
-    "Corrections appear without interrupting the answer.",
-    "Keep drafting your next message.",
-    "Hide feedback. Your draft stays intact.",
-    "Recall the correction. Carry on coding.",
-)
 
 
 def render(fonts, stage, typed="", answer="", followup="", draft=""):
@@ -36,35 +28,27 @@ def render(fonts, stage, typed="", answer="", followup="", draft=""):
     def text(x, y, value, color=TEXT, font="body"):
         draw.text((x, y), value, font=fonts[font], fill=color)
 
-    text(32, 22, "English feedback, outside the conversation", font="title")
-    text(32, 65, "Two hosts. One independent reviewer.", MUTED)
     for x, host, accent in ((32, "Pi", "#b3a1ff"), (576, "Claude Code", "#e8b18c")):
         right = x + 512
-        draw.rounded_rectangle((x, 113, right, 452), radius=14, fill=PANEL, outline=BORDER, width=2)
-        draw.ellipse((x + 20, 135, x + 28, 143), fill=accent)
-        text(x + 42, 126, host, accent, "bold")
-        draw.line((x + 1, 164, right - 1, 164), fill=BORDER)
+        draw.rounded_rectangle((x, 24, right, 363), radius=14, fill=PANEL, outline=BORDER, width=2)
+        draw.ellipse((x + 20, 46, x + 28, 54), fill=accent)
+        text(x + 42, 37, host, accent, "bold")
+        if stage in (4, 5):
+            draw.rounded_rectangle((right - 96, 34, right - 16, 62), radius=6, fill=BORDER)
+            text(right - 86, 37, "Ctrl+N", font="bold")
+        draw.line((x + 1, 75, right - 1, 75), fill=BORDER)
         if stage:
-            text(x + 20, 186, "> " + PROMPT)
-            text(x + 20, 235, answer)
-            text(x + 20, 264, followup)
+            text(x + 20, 97, "> " + PROMPT)
+            text(x + 20, 146, answer)
+            text(x + 20, 175, followup)
         if stage in (2, 3, 5):
-            text(x + 20, 322, "Correction: “teh” → “the”", BLUE)
-            text(x + 20, 350, "  Swap the last two letters.", BLUE)
-        draw.line((x + 20, 397, right - 20, 397), fill=BORDER)
+            text(x + 20, 233, "Correction: “teh” → “the”", BLUE)
+            text(x + 20, 261, "  Swap the last two letters.", BLUE)
+        draw.line((x + 20, 308, right - 20, 308), fill=BORDER)
         entry = typed if stage == 0 else draft
-        text(x + 20, 412, "> " + entry)
+        text(x + 20, 323, "> " + entry)
         cursor = x + 20 + draw.textlength("> " + entry, font=fonts["body"])
-        draw.rectangle((cursor + 2, 413, cursor + 11, 433), fill=accent)
-
-    text(32, 478, CAPTIONS[stage], font="bold")
-    if stage in (4, 5):
-        draw.rounded_rectangle((932, 472, 1088, 510), radius=8, fill=BORDER)
-        text(960, 480, "Ctrl+N", font="bold")
-    for i in range(len(CAPTIONS)):
-        left = 32 + 22 * i
-        draw.ellipse((left, 525, left + 8, 533), fill=BLUE if i == stage else BORDER)
-    text(32, 553, "Illustrated demo · synthetic text · not a terminal recording", MUTED, "small")
+        draw.rectangle((cursor + 2, 324, cursor + 11, 344), fill=accent)
     return image
 
 
@@ -78,8 +62,6 @@ def main():
             for name, filename, size in (
                 ("body", "DejaVuSansMono.ttf", 18),
                 ("bold", "DejaVuSansMono-Bold.ttf", 18),
-                ("title", "DejaVuSansMono-Bold.ttf", 28),
-                ("small", "DejaVuSansMono.ttf", 14),
             )
         }
     except OSError:
