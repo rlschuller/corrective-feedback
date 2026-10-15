@@ -4,7 +4,7 @@
   "description": "Private, asynchronous English feedback for Pi and Claude Code, outside the main model context.",
   "type": "module",
   "keywords": ["pi-package"],
-  "files": ["index.ts", "src", "hooks", "scripts", "update-plot.sh", ".claude-plugin/plugin.json", ".claude-plugin/marketplace.json", "README.md", "config.example.json", "claude-config.example.json", "claude-keybindings.example.json"],
+  "files": ["index.ts", "src", "hooks", "scripts", "update-plot.sh", ".claude-plugin/plugin.json", ".claude-plugin/marketplace.json", "README.md", "docs", "config.example.json", "claude-config.example.json", "claude-keybindings.example.json"],
   "engines": { "node": ">=22.19" },
   "pi": { "extensions": ["./index.ts"] },
   "scripts": {
