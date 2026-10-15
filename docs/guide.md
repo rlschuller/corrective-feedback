@@ -368,8 +368,8 @@ neither correction instructions nor correction text enters the main model's hist
 
 The README GIF is a scripted illustration, not a recording of either host. It uses only
 synthetic text and makes no model calls or reads of local sessions, credentials, or logs.
-It illustrates asynchronous corrections, then hiding and recalling them without changing
-a draft. The static PNG provides a non-animated alternative.
+It plays the same steps once in Pi and once in Claude Code: a correction appears after the
+answer, then Ctrl+N hides and recalls it without changing the draft. The static PNG provides a non-animated alternative.
 
 To regenerate both assets, install Pillow in your Python environment, then run:
 
