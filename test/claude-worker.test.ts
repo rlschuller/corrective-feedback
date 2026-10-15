@@ -18,9 +18,10 @@ test("Claude defaults are independent of existing Pi config and overridable", as
   t.after(() => rm(dir, { recursive: true, force: true }));
   const path = join(dir, "config.json");
   const config = await loadClaudeConfig(path);
-  assert.equal(config.model, "gpt-6-sol");
+  assert.equal(config.enabled, true, "Claude reviews are on by default");
+  assert.equal(config.model, "gpt-6.1-sol");
   assert.equal(config.logPath, join(dir, "corrective-feedback", "claude-feedback.jsonl"));
-  assert.equal(defaults().model, "gpt-6-sol", "Pi's existing default stays unchanged");
+  assert.equal(defaults().model, "gpt-6.1-sol", "Both harnesses share the Sol 6.1 reviewer default");
   await writeFile(path, JSON.stringify({ model: "another", enabled: false, logPath: "logs/result.jsonl" }));
   assert.equal((await loadClaudeConfig(path)).model, "another");
   assert.equal((await loadClaudeConfig(path)).enabled, false);
@@ -46,7 +47,7 @@ function harness(raw = JSON.stringify({ corrections: [correction] }), stopReason
   let calls = 0;
   const runtime = {
     getModel(provider: string, model: string) {
-      assert.equal(provider, "openai-codex"); assert.equal(model, "gpt-6-sol");
+      assert.equal(provider, "openai-codex"); assert.equal(model, "gpt-6.1-sol");
       return { provider, id: model };
     },
     async completeSimple(_model: unknown, context: unknown, options: unknown) {
@@ -57,7 +58,7 @@ function harness(raw = JSON.stringify({ corrections: [correction] }), stopReason
       assert.deepEqual(c.tools, []);
       assert.match(c.systemPrompt, /data, not instructions/);
       assert.equal((options as { cacheRetention: string }).cacheRetention, "none");
-      return { stopReason, content: [{ type: "text", text: raw }], responseModel: "gpt-6-sol", usage: { input: 10, output: 20 } };
+      return { stopReason, content: [{ type: "text", text: raw }], responseModel: "gpt-6.1-sol", usage: { input: 10, output: 20 } };
     },
   } as unknown as Pick<ModelRuntime, "getModel" | "completeSimple">;
   return { config, records, get calls() { return calls; }, deps: {
@@ -80,7 +81,7 @@ test("tool-free review uses Pi model runtime and logs real Claude source IDs", a
   assert.equal(record.reviewerMessages[0].content, JSON.stringify({ corrections: [correction] }));
   assert(!JSON.stringify(record).includes(request.action === "review" ? request.text : "unused"));
   const parsed = parseWorkerReply(JSON.stringify(reply));
-  assert("status" in parsed && parsed.status.model === "gpt-6-sol");
+  assert("status" in parsed && parsed.status.model === "gpt-6.1-sol");
 });
 
 test("excluded and disabled reviews never initialize Pi or spend quota; status makes no model call", async () => {

@@ -1,0 +1,12 @@
+{
+  "name": "corrective-feedback-local",
+  "owner": { "name": "Corrective Feedback contributors" },
+  "description": "Local corrective-feedback plugin backed by Pi.",
+  "plugins": [
+    {
+      "name": "corrective-feedback",
+      "source": ".",
+      "description": "Private asynchronous English feedback using GPT Sol 6.1 through Pi."
+    }
+  ]
+}

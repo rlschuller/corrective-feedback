@@ -2,7 +2,7 @@ import { expect, mock, test } from "claude-code/testing";
 import type { TestBody } from "claude-code/testing";
 import type { WorkerRequest } from "../src/claude-protocol.ts";
 
-const STATUS = { enabled: true, provider: "openai-codex", model: "gpt-6-sol", maxInputChars: 12000, timeoutMs: 1000, configPath: "/tmp/config.json", logPath: "/tmp/claude-feedback.jsonl" };
+const STATUS = { enabled: true, provider: "openai-codex", model: "gpt-6.1-sol", maxInputChars: 12000, timeoutMs: 1000, configPath: "/tmp/config.json", logPath: "/tmp/claude-feedback.jsonl" };
 const CORRECTIONS = ['Correction: “adressing” → “addressing”', "  Use a double d."];
 const BAND = {
   plugin: "corrective-feedback", surface: "terminal", component: "AbovePrompt", requestId: "band",
@@ -44,7 +44,7 @@ function setup(on: Parameters<TestBody>[1], options: { lines?: string[]; failRev
     expect(e.argv.join(" ").includes(PROSE)).toBe(false);
     const fails = request.action === "status" ? options.failStatus : options.failReview;
     try {
-      if (request.action === "review" && options.slow) await clock.sleep(20000);
+      if (request.action === "review" && options.slow) await clock.sleep(500);
       const status = { ...STATUS, ...request.settings };
       const raw = JSON.stringify(fails ? { error: "Reviewer failed" } : { status, lines: request.action === "review" ? options.lines ?? CORRECTIONS : [] });
       // UTF-8 text/JSON may arrive in multiple chunks.
@@ -99,7 +99,80 @@ test("feedback commands never return context-bearing text; clear/last work while
   expect(await $.command.run({ ...COMMAND, args: "last" })).toEqual({});
   expect(await ui.find({ type: "Text", text: CORRECTIONS[0] })).toBeDefined();
   expect(await $.command.run({ ...COMMAND, args: "status" })).toEqual({});
-  expect(h.logs[h.logs.length - 1]).toMatch(/gpt-6-sol/);
+  expect(h.logs[h.logs.length - 1]).toMatch(/gpt-6\.1-sol/);
+});
+
+test("keyboard toggle is available while hidden, preserves other mods, and never starts a turn", async ($, on) => {
+  const h = setup(on);
+  await start($);
+  const ui = await $.ui.mount(BAND);
+  const button = await ui.find({ key: "feedback-toggle" });
+  expect(button?.props.action).toBe("confirm:previousField");
+  expect(await ui.find({ type: "Box" })).toBeDefined();
+  await ui.press({ key: "feedback-toggle" }); // No previous correction: silent no-op.
+  expect(h.requests.length).toBe(1);
+  expect(h.logs).toEqual([]);
+
+  await submit($); await $.turn.start({ turnId: "turn-1", text: PROSE });
+  await append($); await h.clock.settle();
+  expect(await ui.find({ type: "Text", text: CORRECTIONS[0] })).toBeDefined(); // Visible by default.
+  await ui.press({ key: "feedback-toggle" });
+  expect(await ui.find({ type: "Text", text: CORRECTIONS[0] })).toBeUndefined();
+  expect(await ui.find({ key: "feedback-toggle" })).toBeDefined();
+  expect(await ui.find({ type: "Text", text: "Other mod's band" })).toBeDefined();
+  await $.turn.complete({ turnId: "turn-1", answer: "Main answer", durationMs: 100, isAborted: false, reason: "answer" });
+  expect(await ui.find({ type: "Text", text: CORRECTIONS[0] })).toBeUndefined();
+  await ui.press({ key: "feedback-toggle" });
+  expect(await ui.find({ type: "Text", text: CORRECTIONS[0] })).toBeDefined();
+  expect(h.requests.length).toBe(2);
+  expect(h.logs).toEqual([]);
+});
+
+test("toggle command shares shortcut state, returns no context, and resets on reload", async ($, on) => {
+  const h = setup(on);
+  await start($); await submit($); await append($); await h.clock.settle();
+  const ui = await $.ui.mount(BAND);
+  expect(await $.command.run({ ...COMMAND, args: "toggle" })).toEqual({});
+  expect(await ui.find({ type: "Text", text: CORRECTIONS[0] })).toBeUndefined();
+  await ui.press({ key: "feedback-toggle" });
+  expect(await ui.find({ type: "Text", text: CORRECTIONS[0] })).toBeDefined();
+  await $.command.run({ ...COMMAND, args: "clear" });
+  await ui.press({ key: "feedback-toggle" });
+  expect(await ui.find({ type: "Text", text: CORRECTIONS[0] })).toBeDefined();
+  await $.command.run({ ...COMMAND, args: "reload" });
+  await ui.press({ key: "feedback-toggle" });
+  expect(await ui.find({ type: "Text", text: CORRECTIONS[0] })).toBeUndefined();
+  await submit($); await append($, "after-reload"); await h.clock.settle();
+  expect(await ui.find({ type: "Text", text: CORRECTIONS[0] })).toBeDefined();
+});
+
+test("hiding feedback does not cancel a pending review; new corrections appear automatically", async ($, on) => {
+  const options = { slow: false };
+  const h = setup(on, options);
+  await start($); await submit($); await append($); await h.clock.settle();
+  const ui = await $.ui.mount(BAND);
+  options.slow = true;
+  await submit($); await append($, "next-uuid"); await h.clock.advance(1);
+  await ui.press({ key: "feedback-toggle" });
+  expect(await ui.find({ type: "Text", text: CORRECTIONS[0] })).toBeUndefined();
+  expect(h.stopped).toBe(2); // Startup + first review; second review still running.
+  await h.clock.advance(500);
+  expect(h.stopped).toBe(3);
+  expect(await ui.find({ type: "Text", text: CORRECTIONS[0] })).toBeDefined();
+  expect(h.requests.filter((r) => r.action === "review").length).toBe(2);
+  expect(h.logs).toEqual([]);
+});
+
+test("shortcut control is terminal-only and absent in headless sessions", async ($, on) => {
+  const h = setup(on);
+  await start($, false);
+  const headless = await $.ui.mount(BAND);
+  expect(await headless.find({ key: "feedback-toggle" })).toBeUndefined();
+  await headless.unmount();
+  await start($);
+  const desktop = await $.ui.mount({ ...BAND, surface: "desktop" });
+  expect(await desktop.find({ key: "feedback-toggle" })).toBeUndefined();
+  expect(h.requests.filter((r) => r.action === "review")).toEqual([]);
 });
 
 test("headless prompts, injected prompts, and cheap exclusions never trigger reviews", async ($, on) => {

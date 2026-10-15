@@ -21,6 +21,11 @@ let last: string[] = [];
 let failure: string | undefined;
 const streams = new Set<HookStream<ProcessSpawnChunk, ProcessSpawnResult>>();
 
+function toggleFeedback($: EngineInterface): void {
+  lines = lines.length ? [] : last;
+  $.ui.invalidate("ui.render");
+}
+
 function reset($: EngineInterface, forgetLast = true): void {
   epoch++;
   pending = [];
@@ -142,7 +147,7 @@ export const register: Register = (on) => {
     settled = true;
     node = (await $.env.get("CLAUDE_CORRECTIVE_FEEDBACK_NODE")) || "node";
     await configure($);
-    await $.command.register({ name: "feedback", description: "Private English feedback: status | on | off | clear | last | model provider/id | reload", immediate: true });
+    await $.command.register({ name: "feedback", description: "Private English feedback: status | on | off | toggle | clear | last | model provider/id | reload", immediate: true });
     return next(e);
   });
 
@@ -222,16 +227,25 @@ export const register: Register = (on) => {
 
   on("ui.render", { component: "AbovePrompt" }, async ($, e, next) => {
     const theirs = await next(e);
-    if (!lines.length) return theirs;
-    const { Box, Text } = $.ui.resolve(e);
+    const keyboard = interactive && e.surface === "terminal";
+    if (!lines.length && !keyboard) return theirs;
+    const { Box, Text, Button } = $.ui.resolve(e);
     return Box({ flexDirection: "column", children: [
       theirs,
+      // Claude cannot register custom keybinding actions. Route Ctrl+N through
+      // this documented, unbound/no-op engine action (see the example bindings).
+      // Keep the control mounted even when feedback is hidden, without a UI row.
+      ...(keyboard ? [Box({ height: 0, children: [Button({
+        key: "feedback-toggle", label: "Toggle English feedback", plain: true,
+        action: "confirm:previousField", onPress: () => toggleFeedback($),
+      })] })] : []),
       ...lines.map((line) => Text({ color: "#5599ff", children: [line] })),
     ] });
   });
 
   on("command.run", { command: "feedback" }, async ($, e) => {
     const [command = "status", value, ...extra] = e.args.trim().split(/\s+/).filter(Boolean);
+    if (command === "toggle") { toggleFeedback($); return {}; }
     if (command === "clear") { lines = []; $.ui.invalidate("ui.render"); return {}; }
     if (command === "last") {
       lines = last;
@@ -257,7 +271,7 @@ export const register: Register = (on) => {
         if (epoch === generation) $.ui.log(displayLine(error instanceof Error ? error.message : "Configuration failed"));
       }
     } else if (command !== "status") {
-      $.ui.log("Usage: /feedback status|on|off|clear|last|model provider/id|reload");
+      $.ui.log("Usage: /feedback status|on|off|toggle|clear|last|model provider/id|reload");
       return {};
     }
     if (status) $.ui.log([

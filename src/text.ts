@@ -3,11 +3,13 @@ export function prepareText(text: string, maxChars: number): string | undefined 
   if (!text.trim() || text.length > maxChars || /^[!/]/.test(text.trim())) return;
   const prose = text
     .replace(/^\s*(`{3,}|~{3,})[^\n]*\n[\s\S]*?^\s*\1[^\n]*(?:\n|$)/gm, "\n")
-    .replace(/`[^`\n]*`/g, " ")
     .replace(/^\s*>.*$/gm, "")
     .replace(/https?:\/\/\S+/g, " ")
     .trim();
-  if (!/[a-zA-Z]{2}/.test(prose)) return;
+  // Inline code supplies grammatical context (e.g. "push to `dev`").
+  // Ignore it only when deciding whether there is any prose to review.
+  const outsideInlineCode = prose.replace(/(?<!`)(`+)(?!`)[^\n]*?(?<!`)\1(?!`)/g, " ");
+  if (!/[a-zA-Z]{2}/.test(outsideInlineCode)) return;
   if (/^(?:yes|no|ok(?:ay)?|thanks|thank you|sure|got it|hold on)[.!\s]*$/i.test(prose)) return;
   return prose;
 }

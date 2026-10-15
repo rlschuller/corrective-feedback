@@ -47,7 +47,7 @@ export default function correctiveFeedback(pi: ExtensionAPI): void {
     clearUI(ctx);
   }
 
-  pi.registerShortcut("ctrl+h", {
+  pi.registerShortcut("ctrl+n", {
     description: "Toggle English feedback",
     handler: (ctx) => {
       if (ctx.mode !== "tui") return;

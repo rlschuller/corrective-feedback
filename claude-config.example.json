@@ -1,7 +1,7 @@
 {
   "enabled": true,
   "provider": "openai-codex",
-  "model": "gpt-6-sol",
+  "model": "gpt-6.1-sol",
   "reasoning": "low",
   "includeSuggestions": false,
   "maxInputChars": 12000,

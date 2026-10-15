@@ -4,3 +4,4 @@ node_modules/
 config.local.json
 coverage/
 .claude-plugin/types/
+screenshot-*.png

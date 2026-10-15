@@ -1,7 +1,7 @@
 import { expect, mock, test } from "claude-code/testing";
 import type { TestBody } from "claude-code/testing";
 
-const STATUS = { enabled: true, provider: "openai-codex", model: "gpt-6-sol", maxInputChars: 12000, timeoutMs: 1000, configPath: "/tmp/config.json", logPath: "/tmp/claude.jsonl" };
+const STATUS = { enabled: true, provider: "openai-codex", model: "gpt-6.1-sol", maxInputChars: 12000, timeoutMs: 1000, configPath: "/tmp/config.json", logPath: "/tmp/claude.jsonl" };
 const COMMAND = { command: "feedback", origin: { kind: "composer" }, presentation: { isFullscreen: false, columns: 100 } } as const;
 const BAND = { plugin: "corrective-feedback", surface: "terminal", component: "AbovePrompt", requestId: "band", props: { hasSurvey: false, isWorking: false, maxRows: 8, bodyColumns: 98, scroll: { offset: 0, bodyRows: 8 }, view: {} } } as const;
 

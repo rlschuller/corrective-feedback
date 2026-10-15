@@ -12,9 +12,10 @@ const correction = { kind: "error", original: "adressing", corrected: "addressin
 
 test("config defaults, home/relative paths and strict validation", async () => {
   const path = "/tmp/feedback-test/config.json";
+  assert.equal(defaults(path).enabled, true, "Automatic reviews are on by default");
   assert.equal(defaults(path).logPath, "/tmp/feedback-test/corrective-feedback/feedback.jsonl");
   assert.equal(parseConfig({ logPath: "logs/out.jsonl" }, path).logPath, "/tmp/feedback-test/logs/out.jsonl");
-  assert.equal((await loadConfig("/nonexistent-feedback-dir/config.json")).model, "gpt-6-sol");
+  assert.equal((await loadConfig("/nonexistent-feedback-dir/config.json")).model, "gpt-6.1-sol");
   for (const value of [null, [], { enabled: "yes" }, { timeoutMs: 0 }, { maxInputChars: 2 }, { model: "" }, { reasoning: "huge" }, { typo: 1 }]) {
     assert.throws(() => parseConfig(value));
   }
@@ -27,6 +28,19 @@ test("cheap input filters skip acknowledgments, commands, code and oversized tex
   assert.equal(prepareText("a".repeat(1001), 1000), undefined);
   assert.equal(prepareText("Anything needs adressing?\n```ts\nconst a = 1\n```", 1000), "Anything needs adressing?");
   assert.equal(prepareText("We should keep the main thread clean.", 1000), "We should keep the main thread clean.");
+});
+
+test("inline code retains grammatical context without making code-only input reviewable", () => {
+  const source = "You can commit, push to `dev` and restart the services.";
+  assert.equal(prepareText(source, 1000), source);
+  const doubleBackticks = "Push to ``release`candidate`` and restart.";
+  assert.equal(prepareText(doubleBackticks, 1000), doubleBackticks);
+  for (const code of ["`dev`", "``release`candidate``", "`dev` / `main`", "```inline``` "]) {
+    assert.equal(prepareText(code, 1000), undefined, code);
+  }
+  const falsePositive = { ...correction, original: "push to   and", corrected: "push and" };
+  assert.throws(() => parseReview(JSON.stringify({ corrections: [falsePositive] }), prepareText(source, 1000)!), /absent from the input/);
+  assert.match(reviewPrompt({ includeSuggestions: false }), /Preserve inline code verbatim/);
 });
 
 test("parser accepts empty results and grounded corrections, filters optional suggestions", () => {

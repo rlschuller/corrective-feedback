@@ -16,7 +16,7 @@ pi install /absolute/path/to/corrective-feedback
 Run `/reload` in an existing Pi session, or start a new one. Pi loads the root `index.ts`
 entry point, displaying the extension as `corrective-feedback` rather than `src`.
 The package has no additional runtime dependencies; Pi loads the TypeScript directly. Log into your chosen provider using
-Pi's `/login`. The default reviewer is **openai-codex/gpt-6-sol**; no separate API key is needed
+Pi's `/login`. The default reviewer is **openai-codex/gpt-6.1-sol**; no separate API key is needed
 when that model is available through your Codex subscription.
 
 To try without installing:
@@ -35,9 +35,9 @@ Removal does not delete your configuration or logs.
 ## Use in Claude Code
 
 Requires **Claude Code 2.1.295+**, **Node.js 22.19+** on `PATH`, and Pi's existing provider
-login (tested with Pi 0.87.1). The default Claude reviewer is **openai-codex/gpt-6-sol**.
+login (tested with Pi 0.87.1). The default Claude reviewer is **openai-codex/gpt-6.1-sol**.
 The Claude subscription is not used for reviews; Pi handles the selected provider's credentials,
-OAuth refresh, and quota. If Sol 6 works in Pi, no separate API key is needed here.
+OAuth refresh, and quota. If Sol 6.1 works in Pi, no separate API key is needed here.
 
 Install the local worker's dependencies once, then load this checkout as a plugin:
 
@@ -51,7 +51,26 @@ To use it while working in another project, run
 `claude --plugin-dir /absolute/path/to/corrective-feedback` from that project. Accept Claude's
 workspace trust prompt when appropriate. Check `/plugin` for the active `corrective-feedback`
 mod, then use `/feedback status`. This does not install the mod globally or change Claude's
-settings. To stop loading it, omit `--plugin-dir` on your next invocation.
+settings. To stop loading this session-only copy, omit `--plugin-dir` on your next invocation.
+
+For permanent **user-scope installation in every project**, use the bundled local marketplace:
+
+```sh
+claude plugin install corrective-feedback --marketplace /absolute/path/to/corrective-feedback --scope user
+```
+
+Then start Claude normally with `claude`, without `--plugin-dir`. In an already-open session,
+run `/reload-plugins` or restart. `claude plugin list` should show
+`corrective-feedback@corrective-feedback-local` enabled at user scope. The local marketplace
+loads this checkout in place, using its existing `node_modules`; keep the checkout at the same
+path. Source edits take effect on reload/restart, without copying or reinstalling the plugin.
+
+To disable or uninstall the user-scope installation:
+
+```sh
+claude plugin disable corrective-feedback@corrective-feedback-local --scope user
+claude plugin uninstall corrective-feedback@corrective-feedback-local --scope user
+```
 
 ### Claude behavior and commands
 
@@ -73,12 +92,34 @@ slow. A worker is also killed if the mod unloads.
 |---|---|
 | `/feedback` or `/feedback status` | Show state, model, config and log paths |
 | `/feedback on` / `/feedback off` | Enable/disable for this runtime; off cancels pending reviews |
+| `/feedback toggle` | Hide/show the latest corrections, like Ctrl+N |
 | `/feedback clear` | Hide corrections without deleting logs or cancelling work |
 | `/feedback last` | Redisplay the latest corrections in this runtime |
-| `/feedback model openai-codex/gpt-6-sol` | Validate/select a model from Pi's catalog |
+| `/feedback model openai-codex/gpt-6.1-sol` | Validate/select a model from Pi's catalog |
 | `/feedback reload` | Cancel pending work and reload configuration |
 
-Command changes are temporary. There is no Ctrl+H binding in Claude; use `clear` and `last`.
+Reviews and automatic correction display are **on by default**. In the terminal, **Ctrl+N**
+hides the current feedback; press it again to recall the latest corrections. It preserves your
+prompt draft, does not cancel reviews or delete logs, and works while Claude is answering.
+New correction-bearing reviews appear automatically, even after you hide an earlier result.
+With no previous corrections, the shortcut is a silent no-op. `/feedback toggle`, `clear`, and
+`last` also work; command changes are temporary.
+
+To enable Ctrl+N, merge `claude-keybindings.example.json` into
+**`~/.claude/keybindings.json`** (or the `CLAUDE_CONFIG_DIR` directory). If you have no existing
+keybindings file, copy the example there. Claude applies keybinding changes automatically;
+after updating this mod, run `/reload-plugins` or restart to load its toggle handler.
+The example binds Ctrl+N in `Global` and unbinds its competing `Footer` binding. Footer navigation
+still works with Down; menu/list bindings are unchanged. Keep your other bindings when merging.
+
+Claude's current mod API cannot register custom keybinding action names. The shortcut routes
+through an invisible, zero-height band button using the documented, otherwise unbound/no-op
+`confirm:previousField` action. It adds no status row and consumes no model turn. If another
+mod uses that same action, choose a different shortcut integration rather than sharing it.
+Both hosts use Ctrl+N, avoiding Ctrl+H's [reserved Backspace behavior in Claude](https://code.claude.com/docs/en/keybindings#reserved-shortcuts).
+To undo the shortcut on removal, delete the example's two `ctrl+n` entries from your keybindings.
+In Desktop, use `/feedback toggle`, `clear`, or `last` instead of the terminal keybinding.
+
 Feedback, warnings, and command status never become Claude messages: drawing uses `ui.render`,
 not prompt submission; command handlers return `{}`, not context-bearing text. History is
 not replayed on resume/reload. Automatic review requires an interactive terminal or Desktop
@@ -88,9 +129,9 @@ surface; the VS Code chat panel and headless jobs are not reviewed.
 
 Optional configuration: **`~/.pi/agent/claude-corrective-feedback.json`**. Copy
 `claude-config.example.json` there to customize it. Its schema is the same as the Pi config
-below, including the default model `gpt-6-sol`, but its default log is
-**`~/.pi/agent/corrective-feedback/claude-feedback.jsonl`**. Pi's existing configuration and
-default reviewer are unchanged.
+below, including the shared default model `gpt-6.1-sol`, but its default log is
+**`~/.pi/agent/corrective-feedback/claude-feedback.jsonl`**. Claude's configuration remains
+separate from Pi's; neither changes the main assistant's model.
 
 - `PI_CODING_AGENT_DIR` selects Pi's credentials/catalog directory and the default config directory.
 - `CLAUDE_CORRECTIVE_FEEDBACK_CONFIG` selects a different Claude feedback config file.
@@ -142,13 +183,27 @@ latter exclusions are best-effort—not a reliable language detector or sensitiv
 The widget shows only blue corrections and explanations, without a header or message ID.
 It clears on the next main run. For multiple inputs in one run, it shows the newest
 correction-bearing review; all reviews and their message IDs remain available in the JSONL.
-Press **Ctrl+H** to toggle feedback: hide it, then press again to show the latest corrections.
+Press **Ctrl+N** to toggle feedback: hide it, then press again to show the latest corrections.
 `/feedback clear` hides it too. Neither deletes logs nor cancels reviews. Hidden feedback
 stays hidden when the main run finishes; new corrections still appear automatically.
-`/feedback last` recalls the latest
-correction-bearing review from this extension runtime. Some terminals cannot distinguish
-Ctrl+H from Backspace; use `/feedback clear` if the shortcut conflicts with editing.
+`/feedback last` recalls the latest correction-bearing review from this extension runtime.
 History is not replayed/re-reviewed on resume or reload.
+
+Pi also binds Ctrl+N to the session picker's named-only filter. To avoid a shortcut-conflict
+warning, merge this remapping into **`~/.pi/agent/keybindings.json`** (or the
+`PI_CODING_AGENT_DIR` directory), preserving any other bindings:
+
+```json
+{
+  "app.session.toggleNamedFilter": "alt+n"
+}
+```
+
+Run `/reload` after updating the extension and keybindings. Feedback then uses Ctrl+N in the
+main editor; the session picker uses Alt+N for its named-only filter. Ctrl+H is no longer
+registered by this extension. Other extensions or custom bindings using Ctrl+N can still
+conflict; `/feedback clear` and `/feedback last` remain available. To undo the filter remapping
+on removal, delete the `app.session.toggleNamedFilter` entry.
 
 Automatic review is **TUI-only**, not print/JSON/RPC/SDK runs, to avoid unexpected costs from
 headless jobs and subagents. Both regular and fullscreen TUI use Pi's standard widget API.
@@ -183,7 +238,7 @@ Copy `config.example.json` to the configuration path and edit it:
 {
   "enabled": true,
   "provider": "openai-codex",
-  "model": "gpt-6-sol",
+  "model": "gpt-6.1-sol",
   "reasoning": "low",
   "includeSuggestions": false,
   "maxInputChars": 12000,
@@ -203,7 +258,7 @@ Default log: `~/.pi/agent/corrective-feedback/feedback.jsonl`.
 One line per successfully completed, valid review (including those with no corrections), with a schema version:
 
 ```json
-{"version":1,"id":"uuid","timestamp":"2026-09-28T00:00:00.000Z","sessionPath":"/path/to/session.jsonl","sessionId":"session-id","userMessageId":"entry-id","provider":"openai-codex","model":"gpt-6-sol","corrections":[{"kind":"error","original":"adressing","corrected":"addressing","category":"spelling","explanation":"Use a double d."}],"reviewerMessages":[{"role":"assistant","content":"{\"corrections\":[...]}"}],"usage":{},"durationMs":2000}
+{"version":1,"id":"uuid","timestamp":"2026-09-28T00:00:00.000Z","sessionPath":"/path/to/session.jsonl","sessionId":"session-id","userMessageId":"entry-id","provider":"openai-codex","model":"gpt-6.1-sol","corrections":[{"kind":"error","original":"adressing","corrected":"addressing","category":"spelling","explanation":"Use a double d."}],"reviewerMessages":[{"role":"assistant","content":"{\"corrections\":[...]}"}],"usage":{},"durationMs":2000}
 ```
 
 `reviewerMessages` contains the reviewer's full visible textual response, not reasoning,

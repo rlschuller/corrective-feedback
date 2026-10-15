@@ -64,6 +64,7 @@ async function setup(t: TestContext, options: Record<string, unknown> = {}) {
     appendEntry: () => assert.fail("No feedback text should be added to the main session"),
   };
   extension(api as unknown as ExtensionAPI);
+  assert.deepEqual([...shortcuts.keys()], ["ctrl+n"]); // Do not intercept Ctrl+H/Backspace.
   const emit = async (name: string, event: any = {}) => handlers.get(name)?.(event, ctx as unknown as ExtensionContext);
   const command = async (args: string) => commands.get("feedback")!(args, ctx);
   const shortcut = async (key: string) => {
@@ -97,7 +98,7 @@ test("review is asynchronous, isolated, linked to persisted ID, and displayed be
   await h.user();
   assert.equal(h.calls.length, 1); // The main input handler returned despite an unfinished model call.
   const call = h.calls[0];
-  assert.equal(call.model.id, "gpt-6-sol");
+  assert.equal(call.model.id, "gpt-6.1-sol");
   assert.deepEqual(call.context.tools, []);
   assert.equal(call.context.messages.length, 1);
   assert.equal(JSON.parse(call.context.messages[0].content), "Anything needs adressing?");
@@ -169,7 +170,7 @@ test("a review finishing after the main agent displays without triggering anothe
   assert.match(h.widgets.at(-1)!.join("\n"), /addressing/);
 });
 
-test("Ctrl+H toggles feedback without deleting logs, and settlement does not restore it", async (t) => {
+test("Ctrl+N toggles feedback without deleting logs, and settlement does not restore it", async (t) => {
   const h = await setup(t);
   await h.user();
   h.calls[0].resolve(response());
@@ -177,29 +178,29 @@ test("Ctrl+H toggles feedback without deleting logs, and settlement does not res
   const shown = h.widgets.at(-1);
   assert.ok(shown);
   const log = await readFile(h.log, "utf8");
-  await h.shortcut("ctrl+h");
+  await h.shortcut("ctrl+n");
   assert.equal(h.widgets.at(-1), undefined);
   await h.emit("agent_settled");
   assert.equal(h.widgets.at(-1), undefined);
   assert.equal(await readFile(h.log, "utf8"), log);
-  await h.shortcut("ctrl+h");
+  await h.shortcut("ctrl+n");
   assert.deepEqual(h.widgets.at(-1), shown);
-  await h.shortcut("ctrl+h");
+  await h.shortcut("ctrl+n");
   assert.equal(h.widgets.at(-1), undefined);
   await h.command("last");
   assert.deepEqual(h.widgets.at(-1), shown);
-  await h.shortcut("ctrl+h");
+  await h.shortcut("ctrl+n");
   assert.equal(h.widgets.at(-1), undefined);
-  await h.shortcut("ctrl+h");
+  await h.shortcut("ctrl+n");
   assert.deepEqual(h.widgets.at(-1), shown);
   await h.command("clear");
-  await h.shortcut("ctrl+h");
+  await h.shortcut("ctrl+n");
   assert.deepEqual(h.widgets.at(-1), shown);
 });
 
-test("Ctrl+H is harmless without feedback and resets visibility on a new run", async (t) => {
+test("Ctrl+N is harmless without feedback and resets visibility on a new run", async (t) => {
   const h = await setup(t);
-  await h.shortcut("ctrl+h");
+  await h.shortcut("ctrl+n");
   assert.equal(h.widgets.at(-1), undefined);
   assert.equal(h.notices.length, 0);
   await h.user();
@@ -209,10 +210,10 @@ test("Ctrl+H is harmless without feedback and resets visibility on a new run", a
   assert.ok(shown);
   await h.emit("agent_start");
   assert.equal(h.widgets.at(-1), undefined);
-  await h.shortcut("ctrl+h");
+  await h.shortcut("ctrl+n");
   assert.deepEqual(h.widgets.at(-1), shown);
   await h.emit("session_tree");
-  await h.shortcut("ctrl+h");
+  await h.shortcut("ctrl+n");
   assert.equal(h.widgets.at(-1), undefined);
 });
 
@@ -222,7 +223,7 @@ test("dismissal does not cancel pending work; a new correction appears immediate
   await h.user("This also needs adressing.", "interactive", false);
   h.calls[0].resolve(response());
   await tick();
-  await h.shortcut("ctrl+h");
+  await h.shortcut("ctrl+n");
   assert.equal(h.widgets.at(-1), undefined);
   assert.equal(h.calls[1].options.signal.aborted, false);
   h.calls[1].resolve(response());
@@ -360,9 +361,9 @@ test("bad output warns after settlement without logging fabricated corrections",
 
 test("model command selects Sol and rejects unknown models", async (t) => {
   const h = await setup(t, { model: "gpt-6-luna" });
-  await h.command("model openai-codex/gpt-6-sol");
+  await h.command("model openai-codex/gpt-6.1-sol");
   await h.user();
-  assert.equal(h.calls[0].model.id, "gpt-6-sol");
+  assert.equal(h.calls[0].model.id, "gpt-6.1-sol");
   await h.command("model openai-codex/missing");
   assert.match(h.notices.at(-1)!, /must exist/);
 });
