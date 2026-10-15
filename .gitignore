@@ -5,3 +5,4 @@ config.local.json
 coverage/
 .claude-plugin/types/
 screenshot-*.png
+plots/
