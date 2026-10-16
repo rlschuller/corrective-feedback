@@ -32,14 +32,7 @@ corrections appear, either your setup is broken or you made no mistakes.
 | `/feedback model provider/id` | Change the reviewer for this session |
 | `/feedback reload` | Reload configuration |
 
-**Ctrl+N** hides or recalls feedback without changing your draft.
-[Set up the Claude shortcut](docs/guide.md#claude-behavior-and-commands) and
-[avoid Pi's shortcut conflict](docs/guide.md#behavior-pi) before using it.
-
-The default reviewer is GPT Sol 6.1; availability depends on your account.
-Choose another available model with `/feedback model provider/id` or customize the
-[Pi](config.example.json) / [Claude](claude-config.example.json) configuration.
-See [configuration paths and options](docs/guide.md#configuration).
+**Ctrl+N** hides or recalls feedback without changing your draft (needs a one-time setup).
 
 ## Privacy and cost
 
