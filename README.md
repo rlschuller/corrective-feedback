@@ -6,7 +6,7 @@ subagent to correct your English without polluting the main conversation:
 
 ![A spelling correction appears in Pi and Claude Code after the agent answers; Ctrl+N hides and recalls it.](docs/assets/demo.gif)
 
-It also logs the corrections to JSONL files, so you can plot your mistakes and
+It also logs every review to JSONL files, so you can plot your mistakes and
 train your own flashy neural network.
 
 ## Quick start
@@ -41,7 +41,7 @@ Obligatory warning, since my agents are **very** worried about it:
 Please turn off feedback (`/feedback off`) before sending messages with
 sensitive information. Your messages are sent to whichever service you chose
 for corrections. Naturally, these subagent corrections will consume tokens.
-Additionally, the log feature stores the corrections locally.
+Additionally, the log feature stores every review locally.
 
 PS: Now even the humans will understand how the log feature works, right, Claude?
 
