@@ -107,7 +107,6 @@ def main():
 
     output = ROOT / "docs" / "assets"
     output.mkdir(parents=True, exist_ok=True)
-    frames[-1].save(output / "demo.png")
     # One shared palette prevents color flicker; every frame is opaque.
     # Build it from both hosts' frames so each accent color is included.
     sample = Image.new("RGB", (WIDTH, HEIGHT * 4))

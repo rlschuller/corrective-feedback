@@ -1,7 +1,11 @@
 {
   "name": "pi-corrective-feedback",
   "version": "0.1.0",
-  "description": "Private, asynchronous English feedback for Pi and Claude Code, outside the main model context.",
+  "description": "English corrections for your Pi and Claude Code prompts, reviewed by a separate model outside the main conversation.",
+  "author": "Rodrigo Schuller (https://github.com/rlschuller)",
+  "license": "MIT",
+  "homepage": "https://github.com/rlschuller/corrective-feedback",
+  "repository": { "type": "git", "url": "git+https://github.com/rlschuller/corrective-feedback.git" },
   "type": "module",
   "keywords": ["pi-package"],
   "files": ["index.ts", "src", "hooks", "scripts", "update-plot.sh", ".claude-plugin/plugin.json", ".claude-plugin/marketplace.json", "README.md", "docs", "config.example.json", "claude-config.example.json", "claude-keybindings.example.json"],

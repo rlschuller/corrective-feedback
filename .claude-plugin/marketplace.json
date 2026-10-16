@@ -1,12 +1,12 @@
 {
-  "name": "corrective-feedback-local",
-  "owner": { "name": "Corrective Feedback contributors" },
-  "description": "Local corrective-feedback plugin backed by Pi.",
+  "name": "corrective-feedback",
+  "owner": { "name": "Rodrigo Schuller", "url": "https://github.com/rlschuller" },
+  "description": "English corrections for your prompts, outside the main conversation.",
   "plugins": [
     {
       "name": "corrective-feedback",
       "source": ".",
-      "description": "Private asynchronous English feedback using GPT Sol 6.1 through Pi."
+      "description": "English corrections for your prompts, reviewed by a separate model through Pi."
     }
   ]
 }

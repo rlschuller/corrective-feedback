@@ -2,6 +2,7 @@
 import argparse
 import csv
 import json
+import os
 import subprocess
 import sys
 from collections import defaultdict
@@ -20,12 +21,27 @@ import matplotlib.pyplot as plt
 root = Path(__file__).resolve().parents[1]
 parser = argparse.ArgumentParser(description="Refresh daily errors per 1,000 reviewed characters from local Pi/Claude logs.")
 parser.add_argument("--output-dir", type=Path, default=root / "plots")
-parser.add_argument("--timezone", default="America/Sao_Paulo")
+parser.add_argument("--timezone", help="IANA timezone for daily buckets (default: the system's local timezone)")
 parser.add_argument("--node", default="node", help="Node.js 22.19+ executable")
 parser.add_argument("--pi-log", type=Path, help="Override Pi's configured feedback log")
 parser.add_argument("--claude-log", type=Path, help="Override Claude's configured feedback log")
 args = parser.parse_args()
-zone = ZoneInfo(args.timezone)
+
+
+def local_zone():
+    """The system timezone, by IANA name when it can be found (for DST-correct days)."""
+    tz = os.environ.get("TZ", "").lstrip(":")
+    for name in (tz, tz.partition("zoneinfo/")[2], os.path.realpath("/etc/localtime").partition("zoneinfo/")[2]):
+        try:
+            if name:
+                return ZoneInfo(name), name
+        except (KeyError, ValueError):
+            pass
+    zone = datetime.now().astimezone().tzinfo
+    return zone, zone.tzname(None) or "local time"
+
+
+zone, zone_name = (ZoneInfo(args.timezone), args.timezone) if args.timezone else local_zone()
 try:
     recovered = subprocess.run([
         args.node, "--experimental-strip-types", str(root / "scripts/review-character-counts.mjs"),
@@ -117,7 +133,7 @@ volume.grid(axis="y", color="#eeeeee")
 volume.xaxis.set_major_locator(mdates.DayLocator() if len(days) <= 14 else mdates.AutoDateLocator(minticks=6, maxticks=14))
 volume.xaxis.set_major_formatter(mdates.DateFormatter("%b %d"))
 years = str(first.year) if first.year == last.year else f"{first.year}–{last.year}"
-volume.set_xlabel(f"Date ({years} · {args.timezone})")
+volume.set_xlabel(f"Date ({years} · {zone_name})")
 pi_reviews = sum(r["pi_reviewed_prompts"] for r in rows)
 claude_reviews = sum(r["claude_reviewed_prompts"] for r in rows)
 fig.text(0.09, 0.059,
@@ -134,7 +150,7 @@ fig.savefig(base.with_suffix(".svg"), facecolor="white")
 plt.close(fig)
 print(json.dumps({"reviews": n_reviews, "reviewed_characters": n_characters, "errors": n_errors,
     "overall_errors_per_1000_characters": mean, "excluded_reviews": len(snapshot["excluded"]),
-    "through": last.isoformat(), "timezone": args.timezone,
+    "through": last.isoformat(), "timezone": zone_name,
     "exclusions_by_reason": dict((reason, sum(r["reason"] == reason for r in snapshot["excluded"]))
         for reason in sorted({r["reason"] for r in snapshot["excluded"]})),
     "output_files": [str(base.with_suffix(suffix)) for suffix in (".png", ".svg", ".csv")],

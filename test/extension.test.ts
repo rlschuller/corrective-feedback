@@ -14,7 +14,7 @@ const response = (corrections = [correction]) => ({
   stopReason: "stop", usage: { totalTokens: 123 },
 });
 
-async function setup(t: TestContext, options: Record<string, unknown> = {}) {
+async function setup(t: TestContext, options: Record<string, unknown> = {}, authorized = (_provider: string) => true) {
   const dir = await mkdtemp(join(tmpdir(), "feedback-extension-"));
   const path = join(dir, "config.json");
   const log = join(dir, "feedback.jsonl");
@@ -45,7 +45,7 @@ async function setup(t: TestContext, options: Record<string, unknown> = {}) {
     },
     modelRegistry: {
       find: (provider: string, id: string) => id === "missing" ? undefined : { provider, id },
-      hasConfiguredAuth: () => true,
+      hasConfiguredAuth: (model: { provider: string }) => authorized(model.provider),
       streamSimple: (model: any, context: any, options: any) => {
         let resolve!: (value: any) => void;
         const pending = new Promise((done) => { resolve = done; });
@@ -398,4 +398,31 @@ test("review failure does not prevent subsequent queued reviews", async (t) => {
   await h.emit("agent_settled");
   assert.match(h.widgets.at(-1)!.join("\n"), /addressing/);
   assert.match(h.notices[0], /did not finish/);
+});
+
+test("missing reviewer login disables feedback once at startup instead of warning every turn", async (t) => {
+  let loggedIn = false;
+  const h = await setup(t, {}, () => loggedIn);
+  assert.equal(h.notices.length, 1);
+  assert.match(h.notices[0], /disabled: No configured authentication for openai-codex; use \/login/);
+  await h.user();
+  await h.emit("agent_settled");
+  await h.user("It needs adressing.");
+  await h.emit("agent_settled");
+  assert.equal(h.calls.length, 0);
+  assert.equal(h.notices.length, 1);
+  await h.command("on");
+  assert.match(h.notices.at(-1)!, /stays off/);
+  loggedIn = true;
+  await h.command("on");
+  await h.user();
+  assert.equal(h.calls.length, 1);
+});
+
+test("model command rejects a model without configured authentication", async (t) => {
+  const h = await setup(t, {}, (provider) => provider === "openai-codex");
+  await h.command("model other/some-model");
+  assert.match(h.notices.at(-1)!, /No configured authentication for other/);
+  await h.user();
+  assert.equal(h.calls[0].model.provider, "openai-codex");
 });

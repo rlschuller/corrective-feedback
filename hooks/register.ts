@@ -56,11 +56,14 @@ async function worker($: EngineInterface, request: WorkerRequest, timeoutMs: num
   });
   const read = async () => {
     let output = "";
+    let errors = "";
     for await (const chunk of stream) {
       if (chunk.stream === "stdout") output += chunk.text;
+      else errors = (errors + chunk.text).slice(-4000);
       if (output.length > 200000) throw new Error("Reviewer worker output is too large");
     }
     const result = await stream.result;
+    if (!output.trim()) throw new Error(startFailure($, errors, result.code));
     const reply = parseWorkerReply(output);
     if ("error" in reply) throw new Error(reply.error);
     if (result.code !== 0) throw new Error("Reviewer worker failed");
@@ -74,6 +77,15 @@ async function worker($: EngineInterface, request: WorkerRequest, timeoutMs: num
     streams.delete(stream);
     void stream.return({ code: null, signal: "SIGTERM" }).catch(() => {});
   }
+}
+
+/** The worker printed nothing: it crashed before main(), usually on a missing dependency. */
+function startFailure($: EngineInterface, errors: string, code: number | null): string {
+  if (/ERR_MODULE_NOT_FOUND|Cannot find (package|module)/.test(errors)) {
+    return `Reviewer worker is missing dependencies; run "npm ci --ignore-scripts" in ${$.plugin.root}`;
+  }
+  const detail = errors.trim().split("\n").filter(Boolean).pop();
+  return `Reviewer worker failed to start (exit code ${code ?? "none"})` + (detail ? ": " + detail.slice(0, 300) : "");
 }
 
 function warn($: EngineInterface): void {
@@ -146,7 +158,10 @@ export const register: Register = (on) => {
     sessionPath = null;
     settled = true;
     node = (await $.env.get("CLAUDE_CORRECTIVE_FEEDBACK_NODE")) || "node";
-    await configure($);
+    // Headless sessions are never reviewed, so they never start a worker. Interactive
+    // sessions configure off-hook; prompts sent before it finishes are not reviewed.
+    status = undefined;
+    if (interactive) $.clock.after(0, () => configure($));
     await $.command.register({ name: "feedback", description: "Private English feedback: status | on | off | toggle | clear | last | model provider/id | reload", immediate: true });
     return next(e);
   });
@@ -154,9 +169,10 @@ export const register: Register = (on) => {
   on("classic.SessionStart", async ($, e, next) => {
     sessionId = e.session_id;
     sessionPath = e.transcript_path || null;
-    if (["clear", "resume", "fork"].includes(e.source)) {
+    if (interactive && ["clear", "resume", "fork"].includes(e.source)) {
       settled = true;
-      await configure($);
+      status = undefined;
+      $.clock.after(0, () => configure($));
     }
     return next(e);
   });

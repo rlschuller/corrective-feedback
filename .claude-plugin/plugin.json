@@ -1,6 +1,9 @@
 {
   "name": "corrective-feedback",
   "version": "0.1.0",
-  "description": "Private asynchronous English feedback, reviewed by GPT Sol through Pi.",
-  "author": { "name": "Corrective Feedback contributors" }
+  "description": "English corrections for your prompts, reviewed by a separate model through Pi.",
+  "author": { "name": "Rodrigo Schuller", "url": "https://github.com/rlschuller" },
+  "homepage": "https://github.com/rlschuller/corrective-feedback",
+  "repository": "https://github.com/rlschuller/corrective-feedback",
+  "license": "MIT"
 }

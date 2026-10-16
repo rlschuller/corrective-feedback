@@ -9,9 +9,11 @@ private JSONL writer.
 ## Install in Pi
 
 Requires Node.js 22.19+ and a current Pi with `agent_settled` and `modelRegistry.streamSimple`
-(tested with `@earendil-works/pi-coding-agent` 0.87.1).
+(type-checked against `@earendil-works/pi-coding-agent` 0.87.1, the pinned dev dependency).
 
 ```sh
+pi install git:github.com/rlschuller/corrective-feedback
+# Or, from a local checkout:
 pi install /absolute/path/to/corrective-feedback
 ```
 
@@ -27,21 +29,22 @@ To try without installing:
 pi -e /absolute/path/to/corrective-feedback/index.ts
 ```
 
-For another machine, copy/clone this project and run `pi install /path/to/checkout` there.
 Credentials, logs, and machine-specific configuration are intentionally not in the project.
-A published checkout can also be installed with `pi install git:github.com/rlschuller/corrective-feedback`.
 
-Remove with `pi remove /absolute/path/to/corrective-feedback`, followed by `/reload`.
+Remove with `pi remove` and the same source you installed from, followed by `/reload`.
 Removal does not delete your configuration or logs.
 
 ## Use in Claude Code
 
 Requires **Claude Code 2.1.295+**, **Node.js 22.19+** on `PATH`, and Pi's existing provider
-login (tested with Pi 0.87.1). The default Claude reviewer is **openai-codex/gpt-6.1-sol**.
+login. The worker runs the Pi runtime from this checkout's `node_modules` (the pinned
+`@earendil-works/pi-coding-agent` 0.87.1), which reads and refreshes the same credentials as
+your installed Pi. The default Claude reviewer is **openai-codex/gpt-6.1-sol**.
 The Claude subscription is not used for reviews; Pi handles the selected provider's credentials,
 OAuth refresh, and quota. If Sol 6.1 works in Pi, no separate API key is needed here.
 
-Install the local worker's dependencies once, then load this checkout as a plugin:
+Install the local worker's dependencies once, then load this checkout as a plugin. Without
+them, the mod disables itself and asks you to run `npm ci --ignore-scripts`:
 
 ```sh
 cd /absolute/path/to/corrective-feedback
@@ -63,15 +66,17 @@ claude plugin install corrective-feedback --marketplace /absolute/path/to/correc
 
 Then start Claude normally with `claude`, without `--plugin-dir`. In an already-open session,
 run `/reload-plugins` or restart. `claude plugin list` should show
-`corrective-feedback@corrective-feedback-local` enabled at user scope. The local marketplace
+`corrective-feedback@corrective-feedback` enabled at user scope. The local marketplace
 loads this checkout in place, using its existing `node_modules`; keep the checkout at the same
 path. Source edits take effect on reload/restart, without copying or reinstalling the plugin.
+Install from a local checkout, not from the GitHub repository as a marketplace: a copy Claude
+fetches itself has no `node_modules`, so the worker cannot start.
 
 To disable or uninstall the user-scope installation:
 
 ```sh
-claude plugin disable corrective-feedback@corrective-feedback-local --scope user
-claude plugin uninstall corrective-feedback@corrective-feedback-local --scope user
+claude plugin disable corrective-feedback@corrective-feedback --scope user
+claude plugin uninstall corrective-feedback@corrective-feedback --scope user
 ```
 
 ### Claude behavior and commands
@@ -125,7 +130,9 @@ In Desktop, use `/feedback toggle`, `clear`, or `last` instead of the terminal k
 Feedback, warnings, and command status never become Claude messages: drawing uses `ui.render`,
 not prompt submission; command handlers return `{}`, not context-bearing text. History is
 not replayed on resume/reload. Automatic review requires an interactive terminal or Desktop
-surface; the VS Code chat panel and headless jobs are not reviewed.
+surface; the VS Code chat panel and headless jobs are not reviewed, and headless sessions never
+start the worker. Interactive sessions check the configuration in the background at startup,
+so a prompt sent before that check finishes is not reviewed.
 
 ### Claude configuration and privacy
 
@@ -150,6 +157,10 @@ arguments. The full original prompt is not duplicated in feedback logs. Logs are
 the same 0700 directory/0600 file permissions as Pi's logs. The same privacy caveats apply:
 your prose is sent separately to the reviewer provider, consumes its quota, and corrections
 can contain sensitive excerpts. Use `/feedback off` before submitting sensitive prose.
+
+Under organization-managed Claude Code, the `classic.*` hooks that supply the transcript path
+do not run in user-installed plugins. Reviews are then logged with a null `sessionPath`, and the
+plot updater excludes them.
 
 Claude Code's [mods documentation](https://code.claude.com/docs/en/plugins/mods/overview)
 describes plugin loading and supported surfaces.
@@ -204,8 +215,7 @@ warning, merge this remapping into **`~/.pi/agent/keybindings.json`** (or the
 ```
 
 Run `/reload` after updating the extension and keybindings. Feedback then uses Ctrl+N in the
-main editor; the session picker uses Alt+N for its named-only filter. Ctrl+H is no longer
-registered by this extension. Other extensions or custom bindings using Ctrl+N can still
+main editor; the session picker uses Alt+N for its named-only filter. Other extensions or custom bindings using Ctrl+N can still
 conflict; `/feedback clear` and `/feedback last` remain available. To undo the filter remapping
 on removal, delete the `app.session.toggleNamedFilter` entry.
 
@@ -221,14 +231,16 @@ additional messages are skipped with a warning. Reviews have a configurable time
 |---|---|
 | `/feedback` or `/feedback status` | Show enabled state, model, config and log paths |
 | `/feedback on` / `/feedback off` | Enable/disable for this runtime; off cancels pending work |
-| `/feedback model openai-codex/gpt-6-luna` | Select another model from Pi's catalog |
+| `/feedback model provider/model-id` | Select another model from Pi's catalog |
 | `/feedback clear` | Clear the widget; does not delete logs or cancel pending work |
 | `/feedback last` | Redisplay the most recent corrections in this runtime |
 | `/feedback reload` | Reload configuration and cancel pending reviews |
 
 Command changes are temporary: edit the config for persistence across sessions and reloads.
 `pi --feedback-disabled` overrides automatic review for the invocation, including `/feedback on`.
-A configuration error disables reviews until fixed and reloaded.
+A configuration error disables reviews until fixed and reloaded. If the reviewer model is not
+in Pi's catalog or has no login, feedback turns off with one warning at startup; after `/login`,
+run `/feedback on`.
 
 ## Configuration
 
@@ -306,8 +318,8 @@ The daily and overall rates are `1,000 × errors / reviewed characters`, countin
 code points (including spaces/newlines), including zero-error reviews and excluding suggestions.
 Outputs are `plots/daily-errors-per-1000-characters.{png,svg,csv}`. The `plots/` directory is
 ignored by Git: these files contain personal usage statistics and should stay local.
-Each run replaces those three files with a fresh snapshot; the latest day may be incomplete. Dates default to
-`America/Sao_Paulo`. CSV rows also retain separate Pi/Claude counts.
+Each run replaces those three files with a fresh snapshot; the latest day may be incomplete. Dates use
+the system's local timezone unless you pass `--timezone`. CSV rows also retain separate Pi/Claude counts.
 
 Optional overrides:
 
@@ -369,13 +381,13 @@ neither correction instructions nor correction text enters the main model's hist
 The README GIF is a scripted illustration, not a recording of either host. It uses only
 synthetic text and makes no model calls or reads of local sessions, credentials, or logs.
 It plays the same steps once in Pi and once in Claude Code: a correction appears after the
-answer, then Ctrl+N hides and recalls it without changing the draft. The static PNG provides a non-animated alternative.
+answer, then Ctrl+N hides and recalls it without changing the draft.
 
-To regenerate both assets, install Pillow in your Python environment, then run:
+To regenerate it, install Pillow in your Python environment, then run:
 
 ```sh
 python3 scripts/generate-demo.py
 ```
 
 The generator uses DejaVu Sans Mono fonts from `/usr/share/fonts/truetype/dejavu` by default;
-pass `--font-dir /path/to/fonts` if they are installed elsewhere. Outputs go to `docs/assets/`.
+pass `--font-dir /path/to/fonts` if they are installed elsewhere. The output is `docs/assets/demo.gif`.

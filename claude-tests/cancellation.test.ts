@@ -38,6 +38,7 @@ async function add($: Parameters<TestBody>[0], id: string) {
 test("off invalidates an in-flight review, even if its process returns late", async ($, on) => {
   const h = setup(on);
   await $.session.start({ cwd: "/work", isInteractive: true, surface: "terminal" });
+  await h.clock.settle();
   await add($, "slow");
   await h.clock.advance(1);
   expect(h.reviews).toEqual(["slow"]);
@@ -51,6 +52,7 @@ test("off invalidates an in-flight review, even if its process returns late", as
 test("process deadline releases the next queued review and rejects late output", async ($, on) => {
   const h = setup(on);
   await $.session.start({ cwd: "/work", isInteractive: true, surface: "terminal" });
+  await h.clock.settle();
   await add($, "slow"); await add($, "fast");
   await h.clock.advance(12000);
   expect(h.reviews).toEqual(["slow", "fast"]);

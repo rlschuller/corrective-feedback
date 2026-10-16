@@ -35,6 +35,13 @@ export default function correctiveFeedback(pi: ExtensionAPI): void {
     return configured && config.enabled && ctx.mode === "tui" && !pi.getFlag("feedback-disabled");
   }
 
+  /** Why the reviewer cannot run, checked without a model call; undefined when it can. */
+  function unavailable(ctx: ExtensionContext, provider: string, id: string): string | undefined {
+    const model = ctx.modelRegistry.find(provider, id);
+    if (!model) return `Model not found: ${provider}/${id}`;
+    if (!ctx.modelRegistry.hasConfiguredAuth(model)) return `No configured authentication for ${provider}; use /login, then /feedback on`;
+  }
+
   function clearUI(ctx: ExtensionContext): void {
     feedbackVisible = false;
     if (ctx.mode !== "tui") return;
@@ -166,6 +173,13 @@ export default function correctiveFeedback(pi: ExtensionAPI): void {
       configured = true;
     } catch (error) {
       if (ctx.hasUI) ctx.ui.notify(`English feedback disabled: ${safeLine(String(error))}`, "warning");
+      return;
+    }
+    // Warn once at startup instead of after every turn.
+    const reason = enabled(ctx) ? unavailable(ctx, config.provider, config.model) : undefined;
+    if (reason) {
+      config.enabled = false;
+      ctx.ui.notify(`English feedback disabled: ${safeLine(reason)}`, "warning");
     }
   }
 
@@ -222,6 +236,11 @@ export default function correctiveFeedback(pi: ExtensionAPI): void {
       if (command === "reload") {
         await configure(ctx);
       } else if (command === "on" || command === "off") {
+        const reason = command === "on" ? unavailable(ctx, config.provider, config.model) : undefined;
+        if (reason) {
+          ctx.ui.notify(`English feedback stays off: ${safeLine(reason)}`, "warning");
+          return;
+        }
         reset(ctx);
         config.enabled = command === "on";
       } else if (command === "clear") {
@@ -239,6 +258,11 @@ export default function correctiveFeedback(pi: ExtensionAPI): void {
         const model = value.slice(slash + 1);
         if (slash < 1 || !ctx.modelRegistry.find(provider, model)) {
           ctx.ui.notify("Use /feedback model provider/model-id (must exist in Pi's model catalog)", "warning");
+          return;
+        }
+        const reason = unavailable(ctx, provider, model);
+        if (reason) {
+          ctx.ui.notify(`English feedback: ${safeLine(reason)}`, "warning");
           return;
         }
         reset(ctx);

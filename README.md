@@ -4,9 +4,9 @@ Since we are deep into the sci-fi journey of talking to computers in natural
 language, why not learn a few tricks along the way? This plugin spawns a
 subagent to correct your English without polluting the main conversation:
 
-![A spelling correction appears in Pi and Claude Code while the agent responds; Ctrl+N hides and recalls it.](docs/assets/demo.gif)
+![A spelling correction appears in Pi and Claude Code after the agent answers; Ctrl+N hides and recalls it.](docs/assets/demo.gif)
 
-It also logs your prompts to JSONL files, so you can plot your mistakes and
+It also logs the corrections to JSONL files, so you can plot your mistakes and
 train your own flashy neural network.
 
 ## Quick start
@@ -41,12 +41,12 @@ Obligatory warning, since my agents are **very** worried about it:
 Please turn off feedback (`/feedback off`) before sending messages with
 sensitive information. Your messages are sent to whichever service you chose
 for corrections. Naturally, these subagent corrections will consume tokens.
-Additionally, the log feature stores your messages locally. 
+Additionally, the log feature stores the corrections locally.
 
 PS: Now even the humans will understand how the log feature works, right, Claude?
 
 ## More
 
-- [Full guide](docs/guide.md): installation, configuration, commands, and troubleshooting details.
+- [Full guide](docs/guide.md): installation, configuration, and commands.
 - [Development and tests](docs/guide.md#development-and-verification).
 - [Local statistics and plots](docs/guide.md#update-the-time-series-plot) (generated files are ignored by Git).

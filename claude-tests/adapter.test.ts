@@ -12,8 +12,11 @@ const BAND = {
 const PROSE = "Anything needs adressing?";
 const COMMAND = { command: "feedback", origin: { kind: "composer" }, presentation: { isFullscreen: false, columns: 100 } } as const;
 
-function setup(on: Parameters<TestBody>[1], options: { lines?: string[]; failReview?: boolean; failStatus?: boolean; drop?: boolean; transform?: boolean; slow?: boolean; persistFirst?: boolean } = {}, engine?: Parameters<TestBody>[0]) {
+let startupClock: ReturnType<typeof mock.clock>;
+
+function setup(on: Parameters<TestBody>[1], options: { lines?: string[]; failReview?: boolean; failStatus?: boolean; crash?: string; drop?: boolean; transform?: boolean; slow?: boolean; persistFirst?: boolean } = {}, engine?: Parameters<TestBody>[0]) {
   const clock = mock.clock(on);
+  startupClock = clock;
   mock.env(on, {});
   const requests: WorkerRequest[] = [];
   const logs: string[] = [];
@@ -43,6 +46,10 @@ function setup(on: Parameters<TestBody>[1], options: { lines?: string[]; failRev
     expect(e.argv[2]!.endsWith("/src/claude-worker.ts")).toBe(true);
     expect(e.argv.join(" ").includes(PROSE)).toBe(false);
     const fails = request.action === "status" ? options.failStatus : options.failReview;
+    if (options.crash !== undefined) {
+      if (options.crash) yield { stream: "stderr", text: options.crash };
+      return { value: { code: 1, signal: null } };
+    }
     try {
       if (request.action === "review" && options.slow) await clock.sleep(500);
       const status = { ...STATUS, ...request.settings };
@@ -58,6 +65,7 @@ function setup(on: Parameters<TestBody>[1], options: { lines?: string[]; failRev
 
 async function start($: Parameters<TestBody>[0], interactive = true) {
   await $.session.start({ cwd: "/work", isInteractive: interactive, surface: interactive ? "terminal" : null });
+  await startupClock.settle(); // Configuration runs off-hook.
 }
 async function submit($: Parameters<TestBody>[0], text = PROSE, origin: "composer" | "plugin" | "sdk" | "bridge" = "composer") {
   return $.prompt.submit({ text, wait: false, origin: origin === "plugin" ? { kind: "plugin", name: "another" } : { kind: origin } });
@@ -288,4 +296,24 @@ test("session replacement cancels stale reviews and reloads config and transcrip
   await submit($); await append($, "new-uuid"); await h.clock.settle();
   const r = h.requests.find((r) => r.action === "review")!;
   expect(r.sessionId).toBe("new-session"); expect(r.sessionPath).toBe("/tmp/new-session.jsonl");
+});
+
+test("headless sessions never start the reviewer worker", async ($, on) => {
+  const h = setup(on);
+  await start($, false);
+  await submit($); await append($); await h.clock.settle();
+  expect(h.requests).toEqual([]);
+});
+
+test("a worker that crashes on start explains missing dependencies", async ($, on) => {
+  const h = setup(on, { crash: "Error [ERR_MODULE_NOT_FOUND]: Cannot find package '@earendil-works/pi-coding-agent'\n" });
+  await start($);
+  expect(h.logs.length).toBe(1);
+  expect(h.logs[0]).toMatch(/disabled: .*npm ci --ignore-scripts/);
+});
+
+test("a worker that crashes silently reports its exit code", async ($, on) => {
+  const h = setup(on, { crash: "" });
+  await start($);
+  expect(h.logs[0]).toMatch(/failed to start \(exit code 1\)$/);
 });
