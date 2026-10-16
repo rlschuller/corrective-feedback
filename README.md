@@ -1,44 +1,28 @@
-# Corrective feedback for Pi and Claude Code
+# Corrective feedback
 
-English corrections alongside your coding agent—not in its conversation.
-Feedback appears in blue while the agent keeps working, without editing your prompt
-or adding corrections to the main model's context.
+Since we are deep into the sci-fi journey of talking to computers in natural
+language, why not learn a few tricks along the way? This plugin spawns a
+subagent to correct your English without polluting the main conversation:
 
 ![A spelling correction appears in Pi and Claude Code while the agent responds; Ctrl+N hides and recalls it.](docs/assets/demo.gif)
 
+It also logs your prompts to JSONL files, so you can plot your mistakes and
+train your own flashy neural network.
+
 ## Quick start
 
-Requires **Node.js 22.19+**, **Pi** with a configured reviewer provider (`/login` in Pi),
-and, for the Claude plugin, **Claude Code 2.1.295+**. Tested with Pi **0.87.1**.
-Both plugins use Pi's provider credentials; the Claude subscription is not used for reviews.
-
-```sh
-git clone https://github.com/rlschuller/corrective-feedback.git
-cd corrective-feedback
-```
-
-### Pi
-
-```sh
-pi install "$PWD"
-```
-
-Run `/reload` in Pi, or start a new session.
-
-### Claude Code
-
-```sh
-npm ci --ignore-scripts
-claude --plugin-dir "$PWD"
-```
-
-From another project, use `claude --plugin-dir /absolute/path/to/corrective-feedback`.
-See the [guide](docs/guide.md#use-in-claude-code) for permanent installation across projects.
+Just send `https://github.com/rlschuller/corrective-feedback` to your agent and
+ask it to adapt the project to your setup. I recommend using GPT Sol 6.1 or
+better to correct your English, since GPT Luna 6 is not reliable enough for
+this task. My own setup is a bit unusual: I use Pi with
+`openai-codex/gpt-6.1-sol` to correct what I write in both Claude Code and Pi,
+so technically Pi is an "obligatory" dependency. Until your agent fixes it.
 
 ## Use
 
-Reviews are on by default. Submit a prompt normally; clear English errors get a short
-correction and explanation. No corrections means no extra UI. Suggestions are off by default.
+Reviews are on by default; suggestions are off. When the reviewer spots an
+error, the correction appears above the input field as blue text. If no
+corrections appear, either your setup is broken or you made no mistakes.
 
 | Command | Action |
 |---|---|
@@ -52,17 +36,21 @@ correction and explanation. No corrections means no extra UI. Suggestions are of
 [Set up the Claude shortcut](docs/guide.md#claude-behavior-and-commands) and
 [avoid Pi's shortcut conflict](docs/guide.md#behavior-pi) before using it.
 
-The default reviewer is `openai-codex/gpt-6.1-sol`; availability depends on your account.
+The default reviewer is GPT Sol 6.1; availability depends on your account.
 Choose another available model with `/feedback model provider/id` or customize the
 [Pi](config.example.json) / [Claude](claude-config.example.json) configuration.
 See [configuration paths and options](docs/guide.md#configuration).
 
 ## Privacy and cost
 
-Your prose is sent separately to the reviewer provider and consumes its quota.
-Local feedback logs can contain sensitive excerpts. Filtering is **not** a secret scrubber:
-use `/feedback off` before submitting sensitive text. Feedback can be wrong; your original
-message is never changed. [Privacy details](docs/guide.md#jsonl-and-privacy).
+Obligatory warning, since my agents are **very** worried about it:
+
+Please turn off feedback (`/feedback off`) before sending messages with
+sensitive information. Your messages are sent to whichever service you chose
+for corrections. Naturally, these subagent corrections will consume tokens.
+Additionally, the log feature stores your messages locally. 
+
+PS: Now even the humans will understand how the log feature works, right, Claude?
 
 ## More
 
