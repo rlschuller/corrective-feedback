@@ -1,4 +1,9 @@
-"""Unix Claude Code TUI smoke. Both model paths are stubbed; no model quota is used."""
+"""Unix Claude Code TUI smoke; no model quota is used.
+
+--real-worker-status checks real worker startup with Node absent from PATH,
+then exits without submitting a prompt. Requires Pi's managed Node and login.
+"""
+import argparse
 import fcntl
 import json
 import os
@@ -14,7 +19,13 @@ import termios
 import time
 import uuid
 
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument("--real-worker-status", action="store_true")
+args = parser.parse_args()
 root = Path(__file__).resolve().parents[1]
+claude = shutil.which("claude")
+if not claude:
+    raise SystemExit("Claude Code is not on PATH")
 with tempfile.TemporaryDirectory(prefix="feedback-claude-tui-") as tmp:
     tmp = Path(tmp)
     # Isolate keybindings/settings/trust state; copy only the existing login files.
@@ -68,8 +79,20 @@ print(json.dumps({{'status':s,'lines':['Correction: “adressing” → “addre
     master, slave = pty.openpty()
     fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack("HHHH", 40, 120, 0, 0))
     env = dict(os.environ, TERM="xterm-256color", CLAUDE_CORRECTIVE_FEEDBACK_NODE=str(fake_node), CLAUDE_CODE_NO_FLICKER="0", CLAUDE_CONFIG_DIR=str(config))
+    if args.real_worker_status:
+        env.pop("CLAUDE_CORRECTIVE_FEEDBACK_NODE", None)
+        # Use only basic system commands; exclude Pi's Node and stale versioned paths.
+        # Symlinks also keep this check meaningful on hosts with /usr/bin/node.
+        bin_dir = tmp / "bin"
+        bin_dir.mkdir()
+        for command in ("sh", "bash", "uname", "git", "stty", "tty", "which"):
+            executable = shutil.which(command)
+            if executable:
+                (bin_dir / command).symlink_to(executable)
+        env["PATH"] = str(bin_dir)
+        assert shutil.which("node", path=env["PATH"]) is None
     proc = subprocess.Popen([
-        "claude", "--plugin-dir", str(root), "--plugin-dir", str(mock_plugin),
+        claude, "--plugin-dir", str(root), "--plugin-dir", str(mock_plugin),
         "--strict-mcp-config", "--mcp-config", '{"mcpServers":{}}',
         "--session-id", session_id, "--debug-file", str(debug),
     ], stdin=slave, stdout=slave, stderr=slave, env=env, cwd=tmp, start_new_session=True)
@@ -111,6 +134,21 @@ print(json.dumps({{'status':s,'lines':['Correction: “adressing” → “addre
         # The only workspace being trusted is this generated temporary directory.
         if b"trust this folder" in output or b"Quick" in output:
             os.write(master, b"\x1b[B\r")
+        if args.real_worker_status:
+            drain(5)
+            os.write(master, b"/feedback status\r")
+            deadline = time.monotonic() + 35
+            while time.monotonic() < deadline:
+                drain(0.2)
+                debug_text = debug.read_text() if debug.exists() else ""
+                if "English feedback: on" in debug_text:
+                    break
+                if "English feedback disabled:" in debug_text:
+                    raise RuntimeError("Real worker startup failed: " + debug_text[-5000:])
+            assert "English feedback: on" in debug_text, output.decode(errors="replace")[-5000:]
+            assert "English feedback disabled:" not in debug_text
+            print(json.dumps({"claudeWorkerStartup": "passed", "nodeOnPath": False, "quotaUsed": False}))
+            raise SystemExit(0)
         deadline = time.monotonic() + 20
         while time.monotonic() < deadline:
             drain(0.2)

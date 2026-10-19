@@ -3,12 +3,12 @@ import argparse
 import csv
 import json
 import os
-import subprocess
-import sys
 from collections import defaultdict
 from datetime import datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
+
+from review_character_counts import recover_counts
 
 try:
     import matplotlib
@@ -22,7 +22,6 @@ root = Path(__file__).resolve().parents[1]
 parser = argparse.ArgumentParser(description="Refresh daily errors per 1,000 reviewed characters from local Pi/Claude logs.")
 parser.add_argument("--output-dir", type=Path, default=root / "plots")
 parser.add_argument("--timezone", help="IANA timezone for daily buckets (default: the system's local timezone)")
-parser.add_argument("--node", default="node", help="Node.js 22.19+ executable")
 parser.add_argument("--pi-log", type=Path, help="Override Pi's configured feedback log")
 parser.add_argument("--claude-log", type=Path, help="Override Claude's configured feedback log")
 args = parser.parse_args()
@@ -43,18 +42,12 @@ def local_zone():
 
 zone, zone_name = (ZoneInfo(args.timezone), args.timezone) if args.timezone else local_zone()
 try:
-    recovered = subprocess.run([
-        args.node, "--experimental-strip-types", str(root / "scripts/review-character-counts.mjs"),
-        str(args.pi_log.expanduser().resolve()) if args.pi_log else "",
-        str(args.claude_log.expanduser().resolve()) if args.claude_log else "",
-    ], capture_output=True, text=True)
-except FileNotFoundError:
-    raise SystemExit(f"Node executable not found: {args.node}")
-if recovered.stderr:
-    print(recovered.stderr, file=sys.stderr, end="")
-if recovered.returncode:
-    raise SystemExit(recovered.returncode)
-snapshot = json.loads(recovered.stdout)
+    snapshot = recover_counts(
+        args.pi_log.expanduser().resolve() if args.pi_log else None,
+        args.claude_log.expanduser().resolve() if args.claude_log else None,
+    )
+except (OSError, ValueError) as error:
+    raise SystemExit(str(error)) from None
 buckets = defaultdict(lambda: {host: {"reviews": 0, "characters": 0, "errors": 0} for host in ("pi", "claude")})
 for review in snapshot["reviews"]:
     stamp = datetime.fromisoformat(review["timestamp"].replace("Z", "+00:00"))

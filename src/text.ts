@@ -1,4 +1,6 @@
-/** Cheap exclusions before sending anything to a provider; not a secret scrubber. */
+/** Cheap exclusions before sending anything to a provider; not a secret scrubber.
+ * Keep the Node-free plotting equivalent in scripts/review_character_counts.py in sync.
+ */
 export function prepareText(text: string, maxChars: number): string | undefined {
   if (!text.trim() || text.length > maxChars || /^[!/]/.test(text.trim())) return;
   const prose = text

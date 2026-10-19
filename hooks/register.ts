@@ -10,7 +10,6 @@ let settings: ReviewerSettings = {};
 let interactive = false;
 let sessionId = "";
 let sessionPath: string | null = null;
-let node = "node";
 let epoch = 0;
 let pending: Input[] = [];
 let queue: Job[] = [];
@@ -39,7 +38,26 @@ function reset($: EngineInterface, forgetLast = true): void {
   $.ui.invalidate("ui.render");
 }
 
+/** Pi's managed Node is not necessarily on Claude's inherited PATH. Keep the
+ * stable `current` link: version-specific paths disappear after Pi updates.
+ */
+async function workerNode($: EngineInterface): Promise<string> {
+  const override = await $.env.get("CLAUDE_CORRECTIVE_FEEDBACK_NODE");
+  if (override) return override;
+  const home = await $.env.get("HOME");
+  const dataHome = (await $.env.get("XDG_DATA_HOME")) || (home ? home + "/.local/share" : undefined);
+  if (dataHome) {
+    const candidate = dataHome + "/pi-node/current/bin/node";
+    const stat = await $.fs.stat(candidate).catch(() => undefined);
+    if (stat?.kind === "file") return candidate;
+  }
+  return "node";
+}
+
 async function worker($: EngineInterface, request: WorkerRequest, timeoutMs: number): Promise<WorkerReply> {
+  const generation = epoch;
+  const node = await workerNode($);
+  if (generation !== epoch) throw new Error("Review cancelled");
   const stream = $.process.spawn({
     argv: [node, "--experimental-strip-types", $.plugin.root + "/src/claude-worker.ts"],
     cwd: $.plugin.root,
@@ -72,6 +90,12 @@ async function worker($: EngineInterface, request: WorkerRequest, timeoutMs: num
   try {
     // Release the queue even if an intervening mod is slow to close a spawn stream.
     return await Promise.race([read(), deadline]);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (/ENOENT|executable.*not found|command not found/i.test(message)) {
+      throw new Error(`Cannot start reviewer with ${node}; install Node.js 22.19+ or set CLAUDE_CORRECTIVE_FEEDBACK_NODE to its executable, then run /feedback reload`);
+    }
+    throw error;
   } finally {
     timer.cancel();
     streams.delete(stream);
@@ -81,6 +105,9 @@ async function worker($: EngineInterface, request: WorkerRequest, timeoutMs: num
 
 /** The worker printed nothing: it crashed before main(), usually on a missing dependency. */
 function startFailure($: EngineInterface, errors: string, code: number | null): string {
+  if (/bad option.*experimental-strip-types|unknown.*experimental-strip-types/i.test(errors)) {
+    return "Reviewer requires Node.js 22.19+; set CLAUDE_CORRECTIVE_FEEDBACK_NODE to a supported executable, then run /feedback reload";
+  }
   if (/ERR_MODULE_NOT_FOUND|Cannot find (package|module)/.test(errors)) {
     return `Reviewer worker is missing dependencies; run "npm ci --ignore-scripts" in ${$.plugin.root}`;
   }
@@ -157,7 +184,6 @@ export const register: Register = (on) => {
     sessionId = await $.session.id();
     sessionPath = null;
     settled = true;
-    node = (await $.env.get("CLAUDE_CORRECTIVE_FEEDBACK_NODE")) || "node";
     // Headless sessions are never reviewed, so they never start a worker. Interactive
     // sessions configure off-hook; prompts sent before it finishes are not reviewed.
     status = undefined;

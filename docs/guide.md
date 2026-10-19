@@ -36,8 +36,12 @@ Removal does not delete your configuration or logs.
 
 ## Use in Claude Code
 
-Requires **Claude Code 2.1.295+**, **Node.js 22.19+** on `PATH`, and Pi's existing provider
-login. The worker runs the Pi runtime from this checkout's `node_modules` (the pinned
+Requires **Claude Code 2.1.295+**, **Node.js 22.19+**, and Pi's existing provider
+login. The mod automatically uses Pi's managed Node at
+`${XDG_DATA_HOME:-$HOME/.local/share}/pi-node/current/bin/node` when present, otherwise
+`node` on `PATH`. An explicit `CLAUDE_CORRECTIVE_FEEDBACK_NODE` overrides both. No separate
+Node installation or shell-profile change is needed when Pi's managed runtime is available.
+The worker runs the Pi runtime from this checkout's `node_modules` (the pinned
 `@earendil-works/pi-coding-agent` 0.87.1), which reads and refreshes the same credentials as
 your installed Pi. The default Claude reviewer is **openai-codex/gpt-6.1-sol**.
 The Claude subscription is not used for reviews; Pi handles the selected provider's credentials,
@@ -144,7 +148,17 @@ separate from Pi's; neither changes the main assistant's model.
 
 - `PI_CODING_AGENT_DIR` selects Pi's credentials/catalog directory and the default config directory.
 - `CLAUDE_CORRECTIVE_FEEDBACK_CONFIG` selects a different Claude feedback config file.
-- `CLAUDE_CORRECTIVE_FEEDBACK_NODE` selects the worker's Node executable, if it is not on `PATH`.
+- `CLAUDE_CORRECTIVE_FEEDBACK_NODE` explicitly selects the worker's Node executable,
+  overriding automatic discovery. Prefer a stable path rather than a versioned directory.
+
+If an existing Claude session stopped reviewing after a Pi/Node update, its inherited `PATH`
+may still name a deleted Node version. Run `/reload-plugins` to load the discovery fix, then
+`/feedback status` (or restart Claude). `/feedback reload` rereads the worker configuration
+and runtime selection, but does not reload this plugin's source code.
+
+Node is needed for this implementation's Pi model runtime and provider authentication;
+it is not a requirement for Claude's UI hooks themselves. Removing it would require a
+replacement reviewer backend, unlike the independent Python plotting script.
 
 Workers reread configuration for each request. `/feedback reload` also resets command overrides
 and refreshes the mod's cached input limit, deadline, and displayed status. Invalid config,
@@ -308,9 +322,10 @@ From this checkout, run:
 # Or: npm run plot
 ```
 
-Requires **Python 3.9+ with Matplotlib** and **Node.js 22.19+**. The updater reads Pi's and
-Claude's configured feedback logs, finds each persisted user message by its ID, and applies
-the shared prose filter. It makes no model calls and exports only aggregate data. Keep the
+Requires only **Python 3.9+ with Matplotlib**; Node.js is not needed when running
+`./update-plot.sh` directly. The updater reads Pi's and Claude's configured feedback logs,
+finds each persisted user message by its ID, and applies a Python equivalent of the extension's
+prose filter. It makes no model calls and exports only aggregate data. Keep the
 linked session transcripts: reviews with missing/unrecoverable text are excluded from both
 the error count and character denominator, and the command reports exclusions.
 
@@ -324,8 +339,8 @@ the system's local timezone unless you pass `--timezone`. CSV rows also retain s
 Optional overrides:
 
 ```sh
-npm run plot -- --timezone UTC --output-dir /path/to/output
-npm run plot -- --pi-log /path/to/pi.jsonl --claude-log /path/to/claude.jsonl
+./update-plot.sh --timezone UTC --output-dir /path/to/output
+./update-plot.sh --pi-log /path/to/pi.jsonl --claude-log /path/to/claude.jsonl
 ```
 
 You can also run `/path/to/corrective-feedback/update-plot.sh` from any directory.
@@ -341,9 +356,11 @@ Run commands from the repository root.
 
 ```sh
 npm ci --ignore-scripts
+python3 -m unittest discover -s test -p 'test_plot*.py'  # Node-free plotting tests
 npm run check                 # Pi + worker tests and Node type checking
 npm run claude:check          # Claude's native validator/test kit; no model calls
 python3 test/claude-tui-smoke.py # real Unix Claude TUI, both model paths stubbed
+python3 test/claude-tui-smoke.py --real-worker-status # real startup without Node on PATH; no model calls
 ```
 
 After loading the mod once in an interactive `claude --plugin-dir` session, Claude writes its

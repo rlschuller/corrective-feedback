@@ -3,6 +3,7 @@ node_modules/
 .env
 config.local.json
 coverage/
+__pycache__/
 .claude-plugin/types/
 screenshot-*.png
 plots/

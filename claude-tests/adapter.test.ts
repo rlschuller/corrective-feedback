@@ -14,10 +14,15 @@ const COMMAND = { command: "feedback", origin: { kind: "composer" }, presentatio
 
 let startupClock: ReturnType<typeof mock.clock>;
 
-function setup(on: Parameters<TestBody>[1], options: { lines?: string[]; failReview?: boolean; failStatus?: boolean; crash?: string; drop?: boolean; transform?: boolean; slow?: boolean; persistFirst?: boolean } = {}, engine?: Parameters<TestBody>[0]) {
+function setup(on: Parameters<TestBody>[1], options: { lines?: string[]; failReview?: boolean; failStatus?: boolean; crash?: string; drop?: boolean; transform?: boolean; slow?: boolean; persistFirst?: boolean; env?: Record<string, string>; nodePath?: string } = {}, engine?: Parameters<TestBody>[0]) {
   const clock = mock.clock(on);
   startupClock = clock;
-  mock.env(on, {});
+  mock.env(on, options.env ?? {});
+  on("fs.stat", ($, e) => {
+    if (e.path !== options.nodePath) throw new Error("ENOENT");
+    return { value: { kind: "file", size: 1, mtimeMs: 0, isLink: false } };
+  });
+  const executables: string[] = [];
   const requests: WorkerRequest[] = [];
   const logs: string[] = [];
   let stopped = 0;
@@ -40,6 +45,7 @@ function setup(on: Parameters<TestBody>[1], options: { lines?: string[]; failRev
   on("ui.log", ($, e) => { logs.push(e.text); return { value: undefined }; });
   on("ui.render", () => ({ type: "Text", props: {}, children: ["Other mod's band"] }));
   on("process.spawn", async function* ($, e) {
+    executables.push(e.argv[0]!);
     const request = JSON.parse(e.input!) as WorkerRequest;
     requests.push(request);
     expect(e.argv.length).toBe(3);
@@ -60,7 +66,7 @@ function setup(on: Parameters<TestBody>[1], options: { lines?: string[]; failRev
       return { value: { code: fails ? 1 : 0, signal: null } };
     } finally { stopped++; }
   });
-  return { clock, requests, logs, get stopped() { return stopped; } };
+  return { clock, requests, logs, executables, get stopped() { return stopped; } };
 }
 
 async function start($: Parameters<TestBody>[0], interactive = true) {
@@ -316,4 +322,45 @@ test("a worker that crashes silently reports its exit code", async ($, on) => {
   const h = setup(on, { crash: "" });
   await start($);
   expect(h.logs[0]).toMatch(/failed to start \(exit code 1\)$/);
+});
+
+test("discovers Pi's stable Node path when Claude inherited a stale PATH", async ($, on) => {
+  const nodePath = "/home/test/.local/share/pi-node/current/bin/node";
+  const h = setup(on, { env: { HOME: "/home/test", PATH: "/deleted/node-v22/bin:/usr/bin" }, nodePath });
+  await start($); await submit($); await append($); await h.clock.settle();
+  expect(h.executables).toEqual([nodePath, nodePath]);
+  expect(h.logs).toEqual([]);
+});
+
+test("honors XDG_DATA_HOME for Pi's managed Node", async ($, on) => {
+  const nodePath = "/data/pi-node/current/bin/node";
+  const h = setup(on, { env: { HOME: "/home/test", XDG_DATA_HOME: "/data" }, nodePath });
+  await start($);
+  expect(h.executables).toEqual([nodePath]);
+});
+
+test("explicit Node override wins over Pi's managed runtime", async ($, on) => {
+  const h = setup(on, { env: { HOME: "/home/test", CLAUDE_CORRECTIVE_FEEDBACK_NODE: "/custom/node" },
+    nodePath: "/home/test/.local/share/pi-node/current/bin/node" });
+  await start($);
+  expect(h.executables).toEqual(["/custom/node"]);
+});
+
+test("falls back to PATH when managed Node is absent", async ($, on) => {
+  const h = setup(on, { env: { HOME: "/home/test" } });
+  await start($);
+  expect(h.executables).toEqual(["node"]);
+});
+
+test("missing Node explains how to select a runtime without blocking prompts", async ($, on) => {
+  const h = setup(on, { crash: "spawn node ENOENT" });
+  await start($);
+  expect(h.logs[0]).toMatch(/Cannot start reviewer.*CLAUDE_CORRECTIVE_FEEDBACK_NODE/);
+  expect(await submit($)).toEqual({ text: PROSE });
+});
+
+test("old Node explains the minimum version", async ($, on) => {
+  const h = setup(on, { crash: "node: bad option: --experimental-strip-types\n" });
+  await start($);
+  expect(h.logs[0]).toMatch(/Node.js 22.19\+/);
 });
