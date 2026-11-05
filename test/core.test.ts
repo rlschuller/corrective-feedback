@@ -43,6 +43,27 @@ test("inline code retains grammatical context without making code-only input rev
   assert.match(reviewPrompt({ includeSuggestions: false }), /Preserve inline code verbatim/);
 });
 
+test("URLs retain grammatical context and punctuation without making URL-only input reviewable", () => {
+  const source = "Use the credentials to updated our document, adding the fix to the Minor Changes section: https://docs.example.org/document/d/example/edit?tab=t.0#heading=h.example. Also, create the corresponding issue.";
+  assert.equal(prepareText(source, 1000), source);
+  for (const text of [
+    "See https://example.org and http://example.net.",
+    "Open (https://example.org/path). Then continue.",
+    "Push to https://example.org/repo and restart.",
+    "See [the document](https://example.org/doc). Also, check `dev`.",
+  ]) {
+    assert.equal(prepareText(text, 1000), text);
+  }
+  for (const text of ["https://example.org.", "https://example.org http://example.net", "`dev` https://example.org", "`https://example.org`", "<https://example.org>"]) {
+    assert.equal(prepareText(text, 1000), undefined, text);
+  }
+  const valid = { ...correction, original: "to updated our document", corrected: "to update our document" };
+  assert.deepEqual(parseReview(JSON.stringify({ corrections: [valid] }), prepareText(source, 1000)!), [valid]);
+  const falsePositive = { ...correction, original: "section:   Also,", corrected: "section. Also," };
+  assert.throws(() => parseReview(JSON.stringify({ corrections: [falsePositive] }), prepareText(source, 1000)!), /absent from the input/);
+  assert.match(reviewPrompt({ includeSuggestions: false }), /Preserve URLs verbatim/);
+});
+
 test("parser accepts empty results and grounded corrections, filters optional suggestions", () => {
   assert.deepEqual(parseReview('{"corrections":[]}', "All good."), []);
   assert.deepEqual(parseReview(JSON.stringify({ corrections: [correction, correction] }), "Anything needs adressing?"), [correction]);

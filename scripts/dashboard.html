@@ -1,0 +1,600 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Corrective feedback</title>
+<style>
+  :root {
+    color-scheme: light;
+    --page: #f9f9f7;
+    --surface: #fcfcfb;
+    --text: #0b0b0b;
+    --text-2: #52514e;
+    --muted: #898781;
+    --grid: #e1e0d9;
+    --axis: #c3c2b7;
+    --border: rgba(11, 11, 11, 0.10);
+    --control: #ffffff;
+    --control-on: #0b0b0b;
+    --control-on-text: #ffffff;
+    --series: #2a78d6;
+    --bar: #9ec5f4;
+    --bar-active: #5598e7;
+    --good: #0ca30c;
+    --warning: #fab219;
+    --critical: #d03b3b;
+    --critical-wash: rgba(208, 59, 59, 0.08);
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      color-scheme: dark;
+      --page: #0d0d0d;
+      --surface: #1a1a19;
+      --text: #f0efec;
+      --text-2: #c3c2b7;
+      --grid: #2c2c2a;
+      --axis: #383835;
+      --border: rgba(255, 255, 255, 0.10);
+      --control: #232322;
+      --control-on: #f0efec;
+      --control-on-text: #0b0b0b;
+      --series: #3987e5;
+      --bar: #1c5cab;
+      --bar-active: #5598e7;
+      --critical-wash: rgba(208, 59, 59, 0.16);
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--page); color: var(--text); line-height: 1.45; }
+  main { max-width: 1120px; margin: 0 auto; padding: 28px 16px 48px; }
+  header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 24px; }
+  h1 { font-size: 22px; font-weight: 650; margin: 0; letter-spacing: -0.01em; }
+  .subtitle { color: var(--text-2); margin: 4px 0 0; font-size: 14px; }
+  .status { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-2); white-space: nowrap; }
+  .status i { width: 8px; height: 8px; border-radius: 50%; background: var(--warning); flex: none; }
+  .status[data-state="live"] i { background: var(--good); box-shadow: 0 0 0 3px color-mix(in srgb, var(--good) 22%, transparent); }
+  .status[data-state="offline"] i { background: var(--critical); }
+  .status[data-state="live"] i.pulse { animation: pulse 1.2s ease-out; }
+  @keyframes pulse { from { box-shadow: 0 0 0 0 color-mix(in srgb, var(--good) 60%, transparent); } to { box-shadow: 0 0 0 10px transparent; } }
+  @media (prefers-reduced-motion: reduce) { .status i.pulse { animation: none; } }
+
+  .alert { margin: 20px 0 0; padding: 12px 14px; border-radius: 10px; background: var(--critical-wash);
+           border: 1px solid color-mix(in srgb, var(--critical) 40%, transparent); font-size: 14px; }
+  .alert strong { display: flex; align-items: center; gap: 8px; }
+  .alert strong::before { content: "!"; display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%;
+                          background: var(--critical); color: #fff; font-size: 12px; font-weight: 700; }
+  .alert ul { margin: 6px 0 0; padding-left: 26px; color: var(--text-2); }
+
+  .controls { display: flex; flex-wrap: wrap; align-items: end; gap: 12px 16px; margin: 22px 0 0; }
+  .control { display: grid; gap: 4px; font-size: 12.5px; color: var(--text-2); }
+  .control select, .control input, .segmented label, .controls button {
+    font: inherit; font-size: 14px; color: var(--text); background: var(--control);
+    border: 1px solid var(--border); border-radius: 8px; height: 34px; }
+  .control select { padding: 0 28px 0 10px; }
+  .control input { width: 92px; padding: 0 10px; font-variant-numeric: tabular-nums; }
+  .control input:invalid { border-color: var(--critical); }
+  .with-unit { display: flex; align-items: center; gap: 8px; color: var(--text-2); font-size: 14px; }
+  .segmented { display: flex; }
+  .segmented label { position: relative; display: inline-flex; align-items: center; padding: 0 12px; cursor: pointer; border-radius: 0; margin-left: -1px; }
+  .segmented label:first-of-type { border-radius: 8px 0 0 8px; margin-left: 0; }
+  .segmented label:last-of-type { border-radius: 0 8px 8px 0; }
+  .segmented input { position: absolute; opacity: 0; pointer-events: none; }
+  .segmented label:has(input:checked) { background: var(--control-on); color: var(--control-on-text); border-color: var(--control-on); }
+  .segmented label:has(input:focus-visible), .control select:focus-visible, .control input:focus-visible, .controls button:focus-visible {
+    outline: 2px solid var(--series); outline-offset: 2px; }
+  .controls button { padding: 0 12px; cursor: pointer; color: var(--text-2); }
+  .controls button:hover { color: var(--text); }
+
+  .tiles { display: grid; grid-template-columns: 1.4fr repeat(4, 1fr); gap: 12px; margin: 18px 0 16px; }
+  .tile { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; min-width: 0; }
+  .tile .label { font-size: 13px; color: var(--text-2); }
+  .tile .value { font-size: 26px; font-weight: 600; margin-top: 2px; overflow-wrap: anywhere; }
+  .tile.hero .value { font-size: 48px; line-height: 1.05; letter-spacing: -0.02em; }
+  .tile .note { font-size: 12.5px; color: var(--muted); margin-top: 2px; }
+  @media (max-width: 860px) { .tiles { grid-template-columns: repeat(2, 1fr); } .tile.hero { grid-column: 1 / -1; } }
+
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px 16px 10px; position: relative; }
+  .card h2 { font-size: 15px; font-weight: 600; margin: 0 0 4px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 4px 18px; font-size: 13px; color: var(--text-2); margin-bottom: 4px; }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .key-line { width: 16px; height: 2px; background: var(--series); border-radius: 1px; }
+  .key-ref { width: 16px; border-top: 1.5px dashed var(--text-2); }
+  .key-bar { width: 10px; height: 10px; background: var(--bar); border-radius: 2px; }
+  #chart { position: relative; }
+  #chart svg { display: block; width: 100%; overflow: visible; touch-action: pan-y; }
+  #chart svg:focus { outline: none; }
+  #chart svg:focus-visible { outline: 2px solid var(--series); outline-offset: 4px; border-radius: 4px; }
+  .empty { padding: 72px 16px; text-align: center; color: var(--text-2); }
+  svg text { font-family: inherit; }
+  .tick { fill: var(--muted); font-size: 11.5px; font-variant-numeric: tabular-nums; }
+  .panel-title { fill: var(--text-2); font-size: 12px; }
+  .direct { fill: var(--text); font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .ref-label { fill: var(--text-2); font-size: 11.5px; }
+
+  .tooltip { position: absolute; pointer-events: none; background: var(--surface); color: var(--text);
+             border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; font-size: 13px;
+             box-shadow: 0 6px 24px rgba(0, 0, 0, 0.14); min-width: 210px; max-width: 280px; z-index: 2; }
+  .tooltip[hidden] { display: none; }
+  .tooltip .date { font-weight: 600; margin-bottom: 6px; }
+  .tooltip dl { display: grid; grid-template-columns: auto auto; gap: 2px 16px; margin: 0; }
+  .tooltip dt { color: var(--text-2); }
+  .tooltip dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
+  .tooltip .sw { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; vertical-align: 1px; }
+
+  .more { display: grid; gap: 12px; margin-top: 16px; }
+  details { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 12px 16px; }
+  summary { cursor: pointer; font-weight: 600; font-size: 14px; }
+  .scroll { overflow-x: auto; margin-top: 10px; max-height: 420px; overflow-y: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; font-variant-numeric: tabular-nums; }
+  th, td { padding: 6px 10px; text-align: right; border-bottom: 1px solid var(--grid); white-space: nowrap; }
+  th { position: sticky; top: 0; background: var(--surface); color: var(--text-2); font-weight: 600; }
+  th:first-child, td:first-child { text-align: left; }
+  .sources li, .reasons li { font-size: 13px; color: var(--text-2); overflow-wrap: anywhere; }
+  .sources code { color: var(--text); }
+  a { color: var(--series); }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div>
+      <h1>Errors per page</h1>
+      <p class="subtitle" id="subtitle">Pi and Claude Code reviews</p>
+    </div>
+    <div class="status" id="status" data-state="connecting" role="status"><i aria-hidden="true"></i><span>Connecting…</span></div>
+  </header>
+
+  <div class="alert" id="alert" role="alert" hidden><strong>Some log rows could not be read</strong><ul></ul></div>
+
+  <form class="controls" id="controls" aria-label="View settings">
+    <label class="control">Range
+      <select name="range">
+        <option value="7">Last 7 days</option>
+        <option value="30">Last 30 days</option>
+        <option value="90">Last 90 days</option>
+        <option value="365">Last 12 months</option>
+        <option value="all">All time</option>
+      </select>
+    </label>
+    <label class="control">Group by
+      <select name="group">
+        <option value="day">Day</option>
+        <option value="week">Week</option>
+        <option value="month">Month</option>
+      </select>
+    </label>
+    <div class="control">
+      <span id="source-label">Source</span>
+      <div class="segmented" role="radiogroup" aria-labelledby="source-label">
+        <label><input type="radio" name="source" value="all">All</label>
+        <label><input type="radio" name="source" value="pi">Pi</label>
+        <label><input type="radio" name="source" value="claude">Claude</label>
+      </div>
+    </div>
+    <label class="control">Page size
+      <span class="with-unit"><input name="page" type="number" min="1" max="1000000" step="1" inputmode="numeric" required>characters</span>
+    </label>
+    <button type="button" id="reset">Reset</button>
+  </form>
+
+  <section class="tiles" aria-label="Totals for the selected range">
+    <div class="tile hero"><div class="label">Errors per page</div><div class="value" id="t-rate">–</div><div class="note" id="t-rate-note">&nbsp;</div></div>
+    <div class="tile"><div class="label">Reviews</div><div class="value" id="t-reviews">–</div><div class="note" id="t-hosts">&nbsp;</div></div>
+    <div class="tile"><div class="label">Reviewed pages</div><div class="value" id="t-pages">–</div><div class="note" id="t-chars">&nbsp;</div></div>
+    <div class="tile"><div class="label">Errors</div><div class="value" id="t-errors">–</div><div class="note">suggestions excluded</div></div>
+    <div class="tile"><div class="label">Excluded reviews</div><div class="value" id="t-excluded">–</div><div class="note">all time, text not recoverable</div></div>
+  </section>
+
+  <section class="card" aria-labelledby="chart-title">
+    <h2 id="chart-title">Errors per page and reviewed pages</h2>
+    <div class="legend" aria-hidden="true">
+      <span><i class="key-line"></i>Errors per page</span>
+      <span><i class="key-ref"></i>Average over range</span>
+      <span><i class="key-bar"></i>Reviewed pages</span>
+    </div>
+    <div id="chart"><div class="empty">Waiting for data…</div></div>
+    <div class="tooltip" id="tooltip" hidden></div>
+  </section>
+
+  <section class="more">
+    <details id="table-view">
+      <summary>Table</summary>
+      <div class="scroll"><table>
+        <thead id="table-head"></thead>
+        <tbody id="rows"></tbody>
+      </table></div>
+      <p><a href="#" id="download">Download this view as CSV</a></p>
+    </details>
+    <details>
+      <summary>Sources and exclusions</summary>
+      <ul class="sources" id="sources"></ul>
+      <ul class="reasons" id="reasons"></ul>
+    </details>
+  </section>
+</main>
+
+<script>
+"use strict";
+const $ = (selector) => document.querySelector(selector);
+const DEFAULTS = { range: "all", group: "day", source: "all", page: 1500 };
+const STORAGE_KEY = "corrective-feedback-dashboard";
+const DAY_MS = 86400000;
+const HOST_NAMES = { all: "Pi and Claude Code", pi: "Pi", claude: "Claude Code" };
+
+const number = new Intl.NumberFormat();
+const fixed1 = new Intl.NumberFormat(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+const fixed2 = new Intl.NumberFormat(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const esc = (value) => String(value).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+const rateText = (value) => value == null ? "–" : (value >= 10 ? fixed1 : fixed2).format(value);
+const pagesText = (value) => value >= 100 ? number.format(Math.round(value)) : fixed1.format(value);
+
+// Dates are ISO strings handled as UTC midnights, so DST never shifts a day.
+const toTime = (iso) => Date.UTC(+iso.slice(0, 4), +iso.slice(5, 7) - 1, +iso.slice(8, 10));
+const toIso = (time) => new Date(time).toISOString().slice(0, 10);
+const addDays = (iso, n) => toIso(toTime(iso) + n * DAY_MS);
+const fmt = (iso, options) => new Date(toTime(iso)).toLocaleDateString(undefined, { timeZone: "UTC", ...options });
+const periodStart = (iso, group) => group === "week" ? addDays(iso, -((new Date(toTime(iso)).getUTCDay() + 6) % 7))
+  : group === "month" ? iso.slice(0, 8) + "01" : iso;
+
+let data = null;
+let settings = loadSettings();
+let active = null;   // Index of the highlighted period.
+let geometry = null; // Scales from the latest render, for hover.
+let current = null;  // The computed view.
+
+// ---- Settings: URL parameters win, then this browser's last choice, then defaults.
+function normalize(raw) {
+  const page = Math.round(Number(raw.page));
+  return {
+    range: ["7", "30", "90", "365", "all"].includes(String(raw.range)) ? String(raw.range) : DEFAULTS.range,
+    group: ["day", "week", "month"].includes(raw.group) ? raw.group : DEFAULTS.group,
+    source: ["all", "pi", "claude"].includes(raw.source) ? raw.source : DEFAULTS.source,
+    page: Number.isFinite(page) && page >= 1 && page <= 1e6 ? page : DEFAULTS.page,
+  };
+}
+function loadSettings() {
+  let stored = {};
+  try { stored = JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; } catch {}
+  const params = Object.fromEntries(new URLSearchParams(location.search));
+  return normalize({ ...DEFAULTS, ...stored, ...params });
+}
+function saveSettings() {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(settings)) if (value !== DEFAULTS[key]) params.set(key, value);
+  const query = params.toString();
+  history.replaceState(null, "", query ? `?${query}` : location.pathname);
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(settings)); } catch {}
+}
+function syncControls() {
+  const form = $("#controls");
+  form.range.value = settings.range;
+  form.group.value = settings.group;
+  form.source.value = settings.source;
+  if (Number(form.page.value) !== settings.page) form.page.value = settings.page;
+}
+
+// ---- Aggregation for the current settings.
+function computeView() {
+  const days = data.days;
+  if (!days.length) return null;
+  const s = settings;
+  const field = (name) => s.source === "all" ? name : `${s.source}_${name}`;
+  const byDate = new Map(days.map((d) => [d.date, d]));
+  const end = days[days.length - 1].date > data.today ? days[days.length - 1].date : data.today;
+  const start = s.range === "all" ? days[0].date : addDays(end, 1 - Number(s.range));
+  const periods = [];
+  for (let date = start; date <= end; date = addDays(date, 1)) {
+    const key = periodStart(date, s.group);
+    let period = periods[periods.length - 1];
+    if (!period || period.key !== key) {
+      period = { key, start: date, end: date, reviews: 0, characters: 0, errors: 0, pi: 0, claude: 0 };
+      periods.push(period);
+    }
+    period.end = date;
+    const day = byDate.get(date);
+    if (!day) continue;
+    period.reviews += day[field("reviewed_prompts")];
+    period.characters += day[field("reviewed_characters")];
+    period.errors += day[field("errors")];
+    period.pi += s.source === "claude" ? 0 : day.pi_reviewed_prompts;
+    period.claude += s.source === "pi" ? 0 : day.claude_reviewed_prompts;
+  }
+  const rate = (errors, characters) => characters ? errors * s.page / characters : null;
+  for (const p of periods) { p.rate = rate(p.errors, p.characters); p.pages = p.characters / s.page; }
+  const sum = (key) => periods.reduce((total, p) => total + p[key], 0);
+  const totals = { reviews: sum("reviews"), characters: sum("characters"), errors: sum("errors"), pi: sum("pi"), claude: sum("claude") };
+  totals.rate = rate(totals.errors, totals.characters);
+  totals.pages = totals.characters / s.page;
+  return { periods, totals, start, end };
+}
+
+function periodLabel(p, long) {
+  if (settings.group === "month") return fmt(p.start, { month: long ? "long" : "short", year: "numeric" });
+  if (settings.group === "week") {
+    if (!long) return fmt(p.start, { month: "short", day: "numeric" });
+    return p.start === p.end ? fmt(p.start, { weekday: "short", year: "numeric", month: "short", day: "numeric" })
+      : `${fmt(p.start, { month: "short", day: "numeric" })} – ${fmt(p.end, { month: "short", day: "numeric", year: "numeric" })}`;
+  }
+  return long ? fmt(p.start, { weekday: "short", year: "numeric", month: "short", day: "numeric" }) : fmt(p.start, { month: "short", day: "numeric" });
+}
+
+// ---- Chart.
+function niceTicks(max, count) {
+  const raw = max / count;
+  const power = 10 ** Math.floor(Math.log10(raw));
+  const step = [1, 2, 2.5, 5, 10].map((m) => m * power).find((s) => s >= raw);
+  const top = Math.ceil(max / step - 1e-9) * step;
+  const ticks = [];
+  for (let v = 0; v <= top + step / 2; v += step) ticks.push(+v.toFixed(10));
+  return ticks;
+}
+function roundedTop(x, y, w, h, r) {
+  if (h <= 0) return "";
+  r = Math.min(r, w / 2, h);
+  return `M${x},${y + h}V${y + r}Q${x},${y} ${x + r},${y}H${x + w - r}Q${x + w},${y} ${x + w},${y + r}V${y + h}Z`;
+}
+
+function renderChart() {
+  const host = $("#chart");
+  if (!current) {
+    host.innerHTML = `<div class="empty">No reviews with recoverable character counts yet. New reviews appear here as soon as they are logged.</div>`;
+    geometry = null;
+    return hideTooltip();
+  }
+  if (!current.totals.characters) {
+    host.innerHTML = `<div class="empty">No reviews in this range${settings.source === "all" ? "" : ` from ${esc(HOST_NAMES[settings.source])}`}.</div>`;
+    geometry = null;
+    return hideTooltip();
+  }
+  const periods = current.periods;
+  const width = Math.max(host.clientWidth, 280);
+  const narrow = width < 520;
+  const m = { left: narrow ? 36 : 48, right: narrow ? 40 : 64 };
+  const rateTop = 22, rateH = narrow ? 200 : 250;
+  const volTop = rateTop + rateH + 34, volH = narrow ? 64 : 80;
+  const height = volTop + volH + 26;
+  const plotW = width - m.left - m.right;
+  const n = periods.length;
+  const col = plotW / n;
+  const cx = (i) => m.left + col * (i + 0.5);
+
+  const rates = periods.map((p) => p.rate);
+  const overall = current.totals.rate;
+  const rateTicks = niceTicks(Math.max(0.5, overall ?? 0, ...rates.filter((v) => v != null)) * 1.12, narrow ? 3 : 4);
+  const rateMax = rateTicks[rateTicks.length - 1];
+  const ry = (v) => rateTop + rateH - (v / rateMax) * rateH;
+
+  const pages = periods.map((p) => p.pages);
+  const volTicks = niceTicks(Math.max(0.1, ...pages), 2);
+  const volMax = volTicks[volTicks.length - 1];
+  const vy = (v) => volTop + volH - (v / volMax) * volH;
+
+  const parts = [];
+  for (const [ticks, y] of [[rateTicks, ry], [volTicks, vy]]) {
+    for (const t of ticks) {
+      parts.push(`<line x1="${m.left}" x2="${width - m.right}" y1="${y(t)}" y2="${y(t)}" stroke="${t ? "var(--grid)" : "var(--axis)"}" stroke-width="1" shape-rendering="crispEdges"/>`);
+      parts.push(`<text class="tick" x="${m.left - 8}" y="${y(t) + 4}" text-anchor="end">${esc(number.format(t))}</text>`);
+    }
+  }
+  parts.push(`<text class="panel-title" x="${m.left}" y="${rateTop - 10}">Errors per page (${esc(number.format(settings.page))} characters)</text>`);
+  parts.push(`<text class="panel-title" x="${m.left}" y="${volTop - 10}">Reviewed pages</text>`);
+
+  // Axis labels, anchored on the latest period and thinned to avoid collisions.
+  const every = Math.max(1, Math.ceil((settings.group === "month" ? 76 : narrow ? 56 : 64) / col));
+  for (let i = n - 1; i >= 0; i -= every) {
+    parts.push(`<text class="tick" x="${cx(i)}" y="${volTop + volH + 18}" text-anchor="middle">${esc(periodLabel(periods[i], false))}</text>`);
+  }
+
+  // Volume bars: <= 24px wide, rounded data end, square on the baseline.
+  const barW = Math.max(1, Math.min(24, col - 2));
+  periods.forEach((p, i) => {
+    const y = vy(p.pages);
+    parts.push(`<path data-bar="${i}" d="${roundedTop(cx(i) - barW / 2, y, barW, volTop + volH - y, 4)}" fill="var(--bar)"/>`);
+  });
+
+  if (overall != null) {
+    parts.push(`<line x1="${m.left}" x2="${width - m.right}" y1="${ry(overall)}" y2="${ry(overall)}" stroke="var(--text-2)" stroke-width="1.5" stroke-dasharray="5 4"/>`);
+    parts.push(`<text class="ref-label" x="${width - m.right + 6}" y="${ry(overall) + 4}">${esc(rateText(overall))}</text>`);
+  }
+
+  // Rate line; periods without reviews break it.
+  let path = "";
+  rates.forEach((v, i) => {
+    if (v == null) return;
+    path += `${i && rates[i - 1] != null ? "L" : "M"}${cx(i).toFixed(1)},${ry(v).toFixed(1)}`;
+  });
+  parts.push(`<path d="${path}" fill="none" stroke="var(--series)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`);
+  const last = rates.findLastIndex((v) => v != null);
+  const isolated = (i) => (i === 0 || rates[i - 1] == null) && (i === n - 1 || rates[i + 1] == null);
+  rates.forEach((v, i) => {
+    if (v == null || !(col >= 12 || i === last || isolated(i))) return;
+    parts.push(`<circle cx="${cx(i)}" cy="${ry(v)}" r="4" fill="var(--series)" stroke="var(--surface)" stroke-width="2"/>`);
+  });
+  // Direct label on the latest value only; the tooltip and table carry the rest.
+  if (last >= 0) {
+    const y = ry(rates[last]);
+    const nearRef = overall != null && Math.abs(y - ry(overall)) < 14;
+    const above = y - 12 > rateTop;
+    parts.push(`<text class="direct" x="${cx(last)}" y="${nearRef || !above ? y + 20 : y - 12}" text-anchor="${last === n - 1 && col < 60 ? "end" : "middle"}">${esc(rateText(rates[last]))}</text>`);
+  }
+
+  parts.push(`<g id="hover"></g>`);
+  host.innerHTML = `<svg viewBox="0 0 ${width} ${height}" height="${height}" tabindex="0" role="img"
+    aria-label="Errors per page by ${esc(settings.group)} over ${n} periods, with reviewed pages per ${esc(settings.group)}. Use the arrow keys to read individual periods; the table lists every value.">${parts.join("")}</svg>`;
+  geometry = { m, width, col, ry, rateTop, volTop, volH, n, cx };
+  const svg = host.querySelector("svg");
+  svg.addEventListener("pointermove", (event) => {
+    const box = svg.getBoundingClientRect();
+    const x = (event.clientX - box.left) * (width / box.width);
+    setActive(Math.min(n - 1, Math.max(0, Math.floor((x - m.left) / col))));
+  });
+  svg.addEventListener("pointerleave", () => setActive(null));
+  svg.addEventListener("blur", () => setActive(null));
+  svg.addEventListener("keydown", (event) => {
+    const moves = { ArrowLeft: -1, ArrowRight: 1, Home: -Infinity, End: Infinity };
+    if (event.key === "Escape") return setActive(null);
+    if (!(event.key in moves)) return;
+    event.preventDefault();
+    const start = active ?? (moves[event.key] < 0 ? n : -1);
+    setActive(Math.min(n - 1, Math.max(0, start + moves[event.key])));
+  });
+  if (active != null) setActive(Math.min(active, n - 1));
+}
+
+function setActive(index) {
+  active = index;
+  const svg = $("#chart svg");
+  if (!svg || !geometry) return;
+  svg.querySelectorAll("[data-bar]").forEach((bar) => bar.setAttribute("fill", +bar.dataset.bar === index ? "var(--bar-active)" : "var(--bar)"));
+  const layer = svg.querySelector("#hover");
+  if (index == null) { layer.innerHTML = ""; return hideTooltip(); }
+  const { cx, ry, rateTop, volTop, volH } = geometry;
+  const period = current.periods[index];
+  const x = cx(index);
+  layer.innerHTML = `<line x1="${x}" x2="${x}" y1="${rateTop}" y2="${volTop + volH}" stroke="var(--axis)" stroke-width="1"/>` +
+    (period.rate == null ? "" : `<circle cx="${x}" cy="${ry(period.rate)}" r="5" fill="var(--series)" stroke="var(--surface)" stroke-width="2"/>`);
+  showTooltip(period, x, period.rate == null ? rateTop + 40 : ry(period.rate));
+}
+
+function showTooltip(p, x, y) {
+  const tip = $("#tooltip");
+  const hosts = settings.source === "all"
+    ? `<dt>Pi · Claude</dt><dd>${esc(number.format(p.pi))} · ${esc(number.format(p.claude))}</dd>` : "";
+  tip.innerHTML = `<div class="date">${esc(periodLabel(p, true))}</div><dl>
+    <dt><span class="sw" style="background:var(--series)"></span>Errors per page</dt><dd>${p.rate == null ? "No reviews" : esc(rateText(p.rate))}</dd>
+    <dt>Errors</dt><dd>${esc(number.format(p.errors))}</dd>
+    <dt><span class="sw" style="background:var(--bar)"></span>Pages</dt><dd>${esc(pagesText(p.pages))}</dd>
+    <dt>Characters</dt><dd>${esc(number.format(p.characters))}</dd>
+    <dt>Reviews</dt><dd>${esc(number.format(p.reviews))}</dd>${hosts}</dl>`;
+  tip.hidden = false;
+  const svg = $("#chart svg");
+  const scale = svg.getBoundingClientRect().width / geometry.width;
+  const card = tip.parentElement.getBoundingClientRect();
+  const chart = $("#chart").getBoundingClientRect();
+  const left0 = chart.left - card.left + x * scale;
+  const top0 = chart.top - card.top + y * scale;
+  let left = left0 + 14;
+  if (left + tip.offsetWidth > card.width - 8) left = left0 - 14 - tip.offsetWidth;
+  tip.style.left = `${Math.max(8, left)}px`;
+  tip.style.top = `${Math.max(8, Math.min(top0 - tip.offsetHeight / 2, card.height - tip.offsetHeight - 8))}px`;
+}
+function hideTooltip() { $("#tooltip").hidden = true; }
+
+// ---- Text, tiles and table.
+function tableColumns() {
+  const columns = [
+    ["Period", "period", (p) => periodLabel(p, true)],
+    ["Errors / page", "errors_per_page", (p) => rateText(p.rate), (p) => p.rate ?? ""],
+    ["Errors", "errors", (p) => number.format(p.errors), (p) => p.errors],
+    ["Pages", "pages", (p) => pagesText(p.pages), (p) => +p.pages.toFixed(4)],
+    ["Characters", "reviewed_characters", (p) => number.format(p.characters), (p) => p.characters],
+    ["Reviews", "reviews", (p) => number.format(p.reviews), (p) => p.reviews],
+  ];
+  if (settings.source === "all") {
+    columns.push(["Pi", "pi_reviews", (p) => number.format(p.pi), (p) => p.pi],
+                 ["Claude", "claude_reviews", (p) => number.format(p.claude), (p) => p.claude]);
+  }
+  return columns;
+}
+
+function renderText() {
+  const s = settings;
+  $("#t-excluded").textContent = number.format(data.excluded_reviews);
+  $("#t-rate-note").textContent = `1 page = ${number.format(s.page)} characters`;
+  const t = current?.totals;
+  $("#t-rate").textContent = t ? rateText(t.rate) : "–";
+  $("#t-reviews").textContent = t ? number.format(t.reviews) : "–";
+  $("#t-hosts").textContent = t && s.source === "all" ? `Pi ${number.format(t.pi)} · Claude ${number.format(t.claude)}` : `${HOST_NAMES[s.source]} only`;
+  $("#t-pages").textContent = t ? pagesText(t.pages) : "–";
+  $("#t-chars").textContent = t ? `${number.format(t.characters)} characters` : " ";
+  $("#t-errors").textContent = t ? number.format(t.errors) : "–";
+  $("#subtitle").textContent = current
+    ? `${HOST_NAMES[s.source]} reviews, ${fmt(current.start, { year: "numeric", month: "short", day: "numeric" })} – ${fmt(current.end, { year: "numeric", month: "short", day: "numeric" })} (${data.timezone}) · 1 page = ${number.format(s.page)} characters`
+    : `${HOST_NAMES[s.source]} reviews`;
+
+  const columns = tableColumns();
+  $("#table-head").innerHTML = `<tr>${columns.map(([label]) => `<th scope="col">${esc(label)}</th>`).join("")}</tr>`;
+  $("#rows").innerHTML = current ? current.periods.slice().reverse().map((p) =>
+    `<tr>${columns.map(([, , cell]) => `<td>${esc(cell(p))}</td>`).join("")}</tr>`).join("") : "";
+
+  $("#sources").innerHTML = data.sources.map((src) => `<li>${src.host === "pi" ? "Pi" : "Claude"} log: <code>${esc(src.path)}</code>${src.found ? "" : " (not found yet)"}</li>`).join("");
+  const reasons = Object.entries(data.exclusions_by_reason);
+  $("#reasons").innerHTML = reasons.length
+    ? reasons.map(([reason, count]) => `<li>Excluded, ${esc(reason)}: ${esc(number.format(count))}</li>`).join("")
+    : "<li>No reviews excluded.</li>";
+  const alert = $("#alert");
+  alert.hidden = !data.errors.length;
+  alert.querySelector("ul").innerHTML = data.errors.map((e) => `<li>${esc(e)}</li>`).join("");
+}
+
+function downloadCsv(event) {
+  event.preventDefault();
+  if (!current) return;
+  const columns = tableColumns().slice(1);
+  const header = ["period_start", "period_end", "page_characters", "source", ...columns.map(([, key]) => key)];
+  const lines = [header.join(","), ...current.periods.map((p) =>
+    [p.start, p.end, settings.page, settings.source, ...columns.map(([, , , raw]) => raw(p))].join(","))];
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(new Blob([lines.join("\n") + "\n"], { type: "text/csv" }));
+  link.download = `errors-per-page-by-${settings.group}.csv`;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+}
+
+function render() {
+  const keep = current && active != null ? current.periods[active]?.key : null;
+  current = data ? computeView() : null;
+  active = keep && current ? current.periods.findIndex((p) => p.key === keep) : -1;
+  if (active < 0) active = null;
+  if (!data) return;
+  renderText();
+  renderChart();
+}
+
+function setStatus(state, label) {
+  const status = $("#status");
+  status.dataset.state = state;
+  status.querySelector("span").textContent = label;
+}
+
+function receive(snapshot) {
+  const first = !data;
+  data = snapshot;
+  render();
+  const updated = new Date(snapshot.updated).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  setStatus("live", `Live · updated ${updated}`);
+  if (!first) {
+    const dot = $("#status i");
+    dot.classList.remove("pulse"); void dot.offsetWidth; dot.classList.add("pulse");
+  }
+}
+
+// ---- Wiring.
+syncControls();
+$("#controls").addEventListener("input", (event) => {
+  const form = event.currentTarget;
+  if (event.target.name === "page" && !form.page.checkValidity()) return;
+  settings = normalize({ range: form.range.value, group: form.group.value, source: form.source.value, page: form.page.value });
+  saveSettings();
+  render();
+});
+$("#controls").addEventListener("submit", (event) => event.preventDefault());
+$("#controls").page.addEventListener("blur", syncControls);
+$("#reset").addEventListener("click", () => { settings = { ...DEFAULTS }; syncControls(); saveSettings(); render(); });
+$("#download").addEventListener("click", downloadCsv);
+
+const events = new EventSource("events");
+events.onmessage = (event) => receive(JSON.parse(event.data));
+events.onerror = () => setStatus(events.readyState === EventSource.CLOSED ? "offline" : "connecting",
+  events.readyState === EventSource.CLOSED ? "Disconnected" : "Reconnecting…");
+
+let width = 0;
+new ResizeObserver(() => {
+  const next = $("#chart").clientWidth;
+  if (current && next !== width) { width = next; renderChart(); }
+}).observe($("#chart"));
+</script>
+</body>
+</html>

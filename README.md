@@ -49,4 +49,4 @@ PS: Now even the humans will understand how the log feature works, right, Claude
 
 - [Full guide](docs/guide.md): installation, configuration, and commands.
 - [Development and tests](docs/guide.md#development-and-verification).
-- [Local statistics and plots](docs/guide.md#update-the-time-series-plot) (generated files are ignored by Git).
+- [Live local statistics dashboard](docs/guide.md#live-statistics-dashboard).

@@ -158,7 +158,7 @@ and runtime selection, but does not reload this plugin's source code.
 
 Node is needed for this implementation's Pi model runtime and provider authentication;
 it is not a requirement for Claude's UI hooks themselves. Removing it would require a
-replacement reviewer backend, unlike the independent Python plotting script.
+replacement reviewer backend, unlike the independent Python dashboard.
 
 Workers reread configuration for each request. `/feedback reload` also resets command overrides
 and refreshes the mod's cached input limit, deadline, and displayed status. Invalid config,
@@ -174,7 +174,7 @@ can contain sensitive excerpts. Use `/feedback off` before submitting sensitive 
 
 Under organization-managed Claude Code, the `classic.*` hooks that supply the transcript path
 do not run in user-installed plugins. Reviews are then logged with a null `sessionPath`, and the
-plot updater excludes them.
+dashboard excludes them.
 
 Claude Code's [mods documentation](https://code.claude.com/docs/en/plugins/mods/overview)
 describes plugin loading and supported surfaces.
@@ -202,10 +202,11 @@ register, dialect, and valid stylistic choices. Optional suggestions are off by 
 when enabled, explicitly labeled separately from errors. Feedback is probabilistic: it can
 miss a mistake or make an unnecessary suggestion. Nothing changes your original message.
 
-Fenced code, Markdown blockquotes, URLs, common acknowledgments, shell/slash commands,
-and overly long inputs are cheaply excluded before a request. Inline-code-only inputs are
-skipped; inline code within prose is preserved as grammatical context and sent to the reviewer.
-The model is instructed not to change that code and to ignore non-English text, quoted
+Fenced code, Markdown blockquotes, common acknowledgments, shell/slash commands,
+and overly long inputs are cheaply excluded before a request. Inputs containing only inline
+code and/or URLs are skipped; inline code and URLs within prose are preserved as grammatical
+context and sent to the reviewer, including adjacent punctuation.
+The model is instructed not to change that code or those URLs and to ignore non-English text, quoted
 examples, pasted documents, and logs. These latter exclusions are best-effort—not a reliable
 language detector or sensitive-data filter.
 
@@ -313,42 +314,56 @@ usage and estimated costs even when no corrections result. Failed, cancelled, or
 reviews are not logged, so the log is not a complete billing ledger. Provider dollar estimates
 are not necessarily additional subscription charges.
 
-## Update the time-series plot
+## Live statistics dashboard
 
 From this checkout, run:
 
 ```sh
-./update-plot.sh
-# Or: npm run plot
+./dashboard.sh
+# Or: npm run dashboard
 ```
 
-Requires only **Python 3.9+ with Matplotlib**; Node.js is not needed when running
-`./update-plot.sh` directly. The updater reads Pi's and Claude's configured feedback logs,
-finds each persisted user message by its ID, and applies a Python equivalent of the extension's
-prose filter. It makes no model calls and exports only aggregate data. Keep the
-linked session transcripts: reviews with missing/unrecoverable text are excluded from both
-the error count and character denominator, and the command reports exclusions.
+Then open <http://localhost:8765/> (or pass `--open`). Requires only **Python 3.9+**:
+the server and page use the standard library and no third-party packages, and Node.js is
+not needed when running `./dashboard.sh` directly.
 
-The daily and overall rates are `1,000 × errors / reviewed characters`, counting Unicode
-code points (including spaces/newlines), including zero-error reviews and excluding suggestions.
-Outputs are `plots/daily-errors-per-1000-characters.{png,svg,csv}`. The `plots/` directory is
-ignored by Git: these files contain personal usage statistics and should stay local.
-Each run replaces those three files with a fresh snapshot; the latest day may be incomplete. Dates use
-the system's local timezone unless you pass `--timezone`. CSV rows also retain separate Pi/Claude counts.
+The page shows **errors per page**, where a page is 1,500 reviewed characters by default,
+next to the number of reviewed pages, totals, a table, and a CSV export of the current view.
+Controls above the chart set:
+
+- **Range:** the last 7, 30, or 90 days, the last 12 months, or all time.
+- **Group by:** day, week (starting on Monday), or month.
+- **Source:** Pi and Claude Code together, or either one alone.
+- **Page size:** the number of characters per page.
+
+Settings are kept in the address bar (for example `?range=30&group=week&page=1000`), so a
+view can be bookmarked, and the browser also remembers your last choice. **Reset** restores
+the defaults.
+
+The page updates live: the server checks file metadata once per second (`--interval`), parses
+only rows appended since the last check, and pushes new aggregate counts to open pages over
+Server-Sent Events. Reviews are counted as soon as their transcript row appears. Replaced or
+truncated logs are reread from the start.
+
+The dashboard reads Pi's and Claude's configured feedback logs, finds each persisted user
+message by its ID, and applies a Python equivalent of the extension's prose filter. It makes
+no model calls and serves only daily counts (never prompt text). It listens on `127.0.0.1`
+by default and refuses requests addressed to other host names. Keep the linked session
+transcripts: reviews with missing/unrecoverable text are excluded from both the error count
+and character denominator, and the page lists exclusions by reason.
+
+Errors per page = `errors × page size / reviewed characters`, counting Unicode code points
+(including spaces/newlines), including zero-error reviews and excluding suggestions. The latest
+period may be incomplete. Dates use the system's local timezone unless you pass `--timezone`.
 
 Optional overrides:
 
 ```sh
-./update-plot.sh --timezone UTC --output-dir /path/to/output
-./update-plot.sh --pi-log /path/to/pi.jsonl --claude-log /path/to/claude.jsonl
+./dashboard.sh --port 9000 --timezone UTC --open
+./dashboard.sh --pi-log /path/to/pi.jsonl --claude-log /path/to/claude.jsonl
 ```
 
-You can also run `/path/to/corrective-feedback/update-plot.sh` from any directory.
-The Bash script forwards all options to the Python updater, for example:
-
-```sh
-./update-plot.sh --timezone UTC --output-dir /path/to/output
-```
+You can also run `/path/to/corrective-feedback/dashboard.sh` from any directory.
 
 ## Development and verification
 
@@ -356,7 +371,7 @@ Run commands from the repository root.
 
 ```sh
 npm ci --ignore-scripts
-python3 -m unittest discover -s test -p 'test_plot*.py'  # Node-free plotting tests
+python3 -m unittest discover -s test -p 'test_dashboard*.py'  # Node-free dashboard tests
 npm run check                 # Pi + worker tests and Node type checking
 npm run claude:check          # Claude's native validator/test kit; no model calls
 python3 test/claude-tui-smoke.py # real Unix Claude TUI, both model paths stubbed
