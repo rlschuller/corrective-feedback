@@ -3,6 +3,7 @@
 Keep config resolution and prose filtering aligned with src/config.ts,
 src/claude-reviewer.ts, src/text.ts, and extractText in src/review.ts.
 """
+from collections import Counter
 from datetime import datetime
 import json
 import os
@@ -21,6 +22,30 @@ QUOTE = re.compile(LINE_START + SPACE + r"*>[^\n\r\u2028\u2029]*" + LINE_END)
 URL = re.compile(r"https?://[^" + JS_SPACE + r"]+")
 INLINE_CODE = re.compile(r"(?<!`)(`+)(?!`)[^\n]*?(?<!`)\1(?!`)")
 ACKNOWLEDGMENT = re.compile(r"(?:yes|no|ok(?:ay)?|thanks|thank you|sure|got it|hold on)[.!" + JS_SPACE + r"]*", re.IGNORECASE | re.ASCII)
+
+
+# Reviewers name categories freely ("word_choice", "grammar and spelling"); fold them into a
+# fixed set. A name mentioning several types counts as the one it names first.
+CATEGORIES = ("spelling", "grammar", "prepositions", "articles", "punctuation", "idiom", "word_order", "other")
+CATEGORY_KEYWORDS = (
+    ("word order", "word_order"), ("order", "word_order"),
+    ("spell", "spelling"), ("typo", "spelling"),
+    ("preposition", "prepositions"),
+    ("article", "articles"), ("determiner", "articles"),
+    ("punctuation", "punctuation"), ("capitali", "punctuation"), ("spacing", "punctuation"),
+    ("formatting", "punctuation"), ("comma", "punctuation"), ("hyphen", "punctuation"),
+    ("idiom", "idiom"), ("word choice", "idiom"), ("collocation", "idiom"), ("usage", "idiom"),
+    ("vocabulary", "idiom"), ("wording", "idiom"),
+    ("grammar", "grammar"), ("agreement", "grammar"), ("tense", "grammar"), ("verb", "grammar"),
+    ("plural", "grammar"), ("pronoun", "grammar"),
+)
+
+
+def error_category(name):
+    """Map a reviewer's category name onto CATEGORIES."""
+    text = re.sub(r"[-_\s]+", " ", name.lower()) if isinstance(name, str) else ""
+    found = [(text.find(word), -len(word), category) for word, category in CATEGORY_KEYWORDS if word in text]
+    return min(found)[2] if found else "other"
 
 
 def prepare_text(text):
@@ -198,7 +223,7 @@ class Transcript:
 
 
 class Review:
-    __slots__ = ("host", "timestamp", "stamp", "model", "errors", "session_path", "message_id",
+    __slots__ = ("host", "timestamp", "stamp", "model", "errors", "categories", "session_path", "message_id",
                  "originals", "characters", "raw_characters", "reason")
 
 
@@ -280,6 +305,7 @@ class ReviewCounts:
                 raise ValueError
             corrections = record["corrections"]
             review.errors = sum(c["kind"] == "error" for c in corrections)
+            review.categories = dict(Counter(error_category(c.get("category")) for c in corrections if c["kind"] == "error"))
             review.originals = [c["original"] for c in corrections]
             review.session_path = record.get("sessionPath")
             review.message_id = record.get("userMessageId")
@@ -324,7 +350,8 @@ class ReviewCounts:
         reviews, excluded = [], []
         for host in self.sources:
             for review in self.reviews[host]:
-                item = {"host": host, "timestamp": review.timestamp, "model": review.model, "errors": review.errors}
+                item = {"host": host, "timestamp": review.timestamp, "model": review.model, "errors": review.errors,
+                        "categories": review.categories}
                 if review.reason:
                     excluded.append({**item, "reason": review.reason})
                 else:

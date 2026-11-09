@@ -14,7 +14,7 @@ from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
-from review_character_counts import (JsonlFollower, ReviewCounts, configured_log_path, extract_text,
+from review_character_counts import (JsonlFollower, error_category, ReviewCounts, configured_log_path, extract_text,
                                      prepare_text, read_jsonl, recover_counts)
 
 
@@ -46,6 +46,15 @@ class TextTests(unittest.TestCase):
             with self.subTest(text=text):
                 self.assertEqual(prepare_text(text), expected)
         self.assertEqual(prepare_text("a" * 100001), "a" * 100001)
+
+    def test_error_categories(self):
+        cases = {"spelling": "spelling", "Grammar": "grammar", "preposition": "prepositions", "articles": "articles",
+                 "word_order": "word_order", "word-order": "word_order", "word choice": "idiom", "idiom": "idiom",
+                 "capitalization": "punctuation", "spacing": "punctuation", "grammar and spelling": "grammar",
+                 "spelling and prepositions": "spelling", "subject-verb agreement": "grammar", "tone": "other", None: "other"}
+        for name, expected in cases.items():
+            with self.subTest(name=name):
+                self.assertEqual(error_category(name), expected)
 
     def test_extract_text(self):
         self.assertEqual(extract_text("hello"), "hello")
@@ -188,7 +197,8 @@ class FileTests(unittest.TestCase):
             stream.write(json.dumps({"id": "later", "message": {"role": "user", "content": "More prose here."}}) + "\n")
         self.assertTrue(counts.poll())
         self.assertEqual(counts.snapshot(), {"reviews": [{"host": "pi", "timestamp": "2026-01-01T12:00:00Z",
-            "model": "test-model", "errors": 1, "characters": 11, "rawCharacters": 11}], "excluded": []})
+            "model": "test-model", "errors": 1, "categories": {"other": 1}, "characters": 11, "rawCharacters": 11}],
+            "excluded": []})
         with log.open("a") as stream:
             stream.write(json.dumps(self.record("second", userMessageId="later")) + "\n")
             stream.write(json.dumps(self.record("second")) + "\n")
@@ -245,10 +255,14 @@ class FileTests(unittest.TestCase):
             self.assertRegex(snapshot["today"], r"^\d{4}-\d{2}-\d{2}$")
             with claude.open("a") as log:
                 log.write(json.dumps(self.record("new", timestamp="2026-01-04T12:00:00Z",
-                    corrections=[{"kind": "error", "original": "prose"}])) + "\n")
+                    corrections=[{"kind": "error", "original": "prose", "category": "Spelling"},
+                                 {"kind": "suggestion", "original": "prose", "category": "grammar"}])) + "\n")
             snapshot = next_event(stream)
         self.assertEqual(snapshot["days"][-1]["date"], "2026-01-04")
         self.assertEqual(snapshot["days"][-1]["claude_errors"], 1)
+        self.assertEqual(snapshot["days"][-1]["claude_categories"]["spelling"], 1)
+        self.assertEqual(snapshot["days"][-1]["categories"]["grammar"], 0)
+        self.assertEqual(snapshot["categories"][0], "spelling")
         self.assertEqual(sum(d["reviewed_prompts"] for d in snapshot["days"]), 3)
         self.assertEqual(snapshot["errors"], [])
         self.assertNotIn("Some prose", json.dumps(snapshot))

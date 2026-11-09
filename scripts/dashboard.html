@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -25,33 +25,54 @@
     --warning: #fab219;
     --critical: #d03b3b;
     --critical-wash: rgba(208, 59, 59, 0.08);
+    --shadow: rgba(0, 0, 0, 0.14);
+    /* Error types: fixed per type, so toggling lines never repaints the others. */
+    --c-spelling: #eb6834;
+    --c-grammar: #1baf7a;
+    --c-prepositions: #eda100;
+    --c-articles: #e87ba4;
+    --c-punctuation: #008300;
+    --c-idiom: #6250d6;
+    --c-word_order: #e34948;
+    --c-other: #898781;
     font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
   }
-  @media (prefers-color-scheme: dark) {
-    :root {
-      color-scheme: dark;
-      --page: #0d0d0d;
-      --surface: #1a1a19;
-      --text: #f0efec;
-      --text-2: #c3c2b7;
-      --grid: #2c2c2a;
-      --axis: #383835;
-      --border: rgba(255, 255, 255, 0.10);
-      --control: #232322;
-      --control-on: #f0efec;
-      --control-on-text: #0b0b0b;
-      --series: #3987e5;
-      --bar: #1c5cab;
-      --bar-active: #5598e7;
-      --critical-wash: rgba(208, 59, 59, 0.16);
-    }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --page: #0d0d0d;
+    --surface: #1a1a19;
+    --text: #f0efec;
+    --text-2: #c3c2b7;
+    --grid: #2c2c2a;
+    --axis: #383835;
+    --border: rgba(255, 255, 255, 0.10);
+    --control: #232322;
+    --control-on: #f0efec;
+    --control-on-text: #0b0b0b;
+    --series: #3987e5;
+    --bar: #1c5cab;
+    --bar-active: #5598e7;
+    --critical-wash: rgba(208, 59, 59, 0.16);
+    --shadow: rgba(0, 0, 0, 0.5);
+    --c-spelling: #d95926;
+    --c-grammar: #199e70;
+    --c-prepositions: #c98500;
+    --c-articles: #d55181;
+    --c-punctuation: #008300;
+    --c-idiom: #9085e9;
+    --c-word_order: #e66767;
   }
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--page); color: var(--text); line-height: 1.45; }
   main { max-width: 1120px; margin: 0 auto; padding: 28px 16px 48px; }
-  header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 24px; }
+  header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 24px; }
   h1 { font-size: 22px; font-weight: 650; margin: 0; letter-spacing: -0.01em; }
   .subtitle { color: var(--text-2); margin: 4px 0 0; font-size: 14px; }
+  .header-side { display: flex; align-items: center; gap: 16px; }
+  .theme { font: inherit; font-size: 13px; color: var(--text-2); background: var(--control); border: 1px solid var(--border);
+           border-radius: 8px; height: 30px; padding: 0 10px; cursor: pointer; }
+  .theme:hover { color: var(--text); }
+  .theme:focus-visible { outline: 2px solid var(--series); outline-offset: 2px; }
   .status { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-2); white-space: nowrap; }
   .status i { width: 8px; height: 8px; border-radius: 50%; background: var(--warning); flex: none; }
   .status[data-state="live"] i { background: var(--good); box-shadow: 0 0 0 3px color-mix(in srgb, var(--good) 22%, transparent); }
@@ -87,21 +108,52 @@
   .controls button { padding: 0 12px; cursor: pointer; color: var(--text-2); }
   .controls button:hover { color: var(--text); }
 
-  .tiles { display: grid; grid-template-columns: 1.4fr repeat(4, 1fr); gap: 12px; margin: 18px 0 16px; }
+  .tiles { display: grid; grid-template-columns: 1.3fr 1.3fr repeat(4, 1fr); gap: 12px; margin: 18px 0 16px; }
   .tile { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; min-width: 0; }
   .tile .label { font-size: 13px; color: var(--text-2); }
   .tile .value { font-size: 26px; font-weight: 600; margin-top: 2px; overflow-wrap: anywhere; }
-  .tile.hero .value { font-size: 48px; line-height: 1.05; letter-spacing: -0.02em; }
+  .tile .label .key { display: inline-block; width: 16px; vertical-align: 4px; margin-right: 6px; border-top: 2px solid var(--series); }
+  .tile .label .key.dashed { border-top-style: dashed; }
+  .tile.hero .value { font-size: 44px; line-height: 1.05; letter-spacing: -0.02em; }
   .tile .note { font-size: 12.5px; color: var(--muted); margin-top: 2px; }
-  @media (max-width: 860px) { .tiles { grid-template-columns: repeat(2, 1fr); } .tile.hero { grid-column: 1 / -1; } }
+  @media (max-width: 960px) { .tiles { grid-template-columns: repeat(2, 1fr); } }
 
   .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px 16px 10px; position: relative; }
   .card h2 { font-size: 15px; font-weight: 600; margin: 0 0 4px; }
-  .legend { display: flex; flex-wrap: wrap; gap: 4px 18px; font-size: 13px; color: var(--text-2); margin-bottom: 4px; }
-  .legend span { display: inline-flex; align-items: center; gap: 6px; }
-  .key-line { width: 16px; height: 2px; background: var(--series); border-radius: 1px; }
-  .key-ref { width: 16px; border-top: 1.5px dashed var(--text-2); }
+  .legend { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 4px; }
+  .chip { display: inline-flex; align-items: center; gap: 7px; font: inherit; font-size: 13px; color: var(--muted);
+          background: transparent; border: 1px solid var(--border); border-radius: 999px; height: 28px; padding: 0 11px; cursor: pointer; }
+  .chip:hover { color: var(--text-2); border-color: color-mix(in srgb, var(--text) 25%, transparent); }
+  .chip[aria-pressed="true"] { color: var(--text); background: var(--control); border-color: color-mix(in srgb, var(--text) 22%, transparent); }
+  .chip:focus-visible { outline: 2px solid var(--series); outline-offset: 2px; }
+  .chip .key { width: 16px; border-top: 2px solid var(--c); opacity: 0.35; }
+  .chip .key.dashed { border-top-style: dashed; }
+  .chip[aria-pressed="true"] .key { opacity: 1; }
+  .legend .sep { width: 1px; background: var(--border); margin: 4px 4px; }
+  .legend-static { display: flex; flex-wrap: wrap; gap: 4px 18px; font-size: 12.5px; color: var(--text-2); margin: 2px 0 4px; }
+  .legend-static span { display: inline-flex; align-items: center; gap: 6px; }
+  .key-ref { width: 16px; border-top: 1.5px dotted var(--text-2); }
   .key-bar { width: 10px; height: 10px; background: var(--bar); border-radius: 2px; }
+  .hint { font-size: 12.5px; color: var(--muted); margin: 0; }
+
+  .types { margin-top: 16px; }
+  .type-list { display: grid; grid-template-columns: minmax(150px, auto) 1fr auto auto auto; gap: 0 14px; align-items: stretch; margin-top: 8px;
+               font-size: 13.5px; font-variant-numeric: tabular-nums; }
+  .type-list .head { font-size: 12px; color: var(--muted); padding-bottom: 4px; border-bottom: 1px solid var(--grid); }
+  .type-list .head.num, .type-list .num { text-align: right; }
+  .type-row { display: contents; }
+  .type-row > * { display: flex; align-items: center; padding: 5px 0; border-bottom: 1px solid var(--grid); }
+  .type-row > .num { justify-content: flex-end; }
+  .type-row button { display: flex; align-items: center; gap: 8px; font: inherit; color: var(--text); background: none; border: 0;
+                     padding: 5px 0; cursor: pointer; text-align: left; border-bottom: 1px solid var(--grid); border-radius: 0; }
+  .type-row button:focus-visible { outline: 2px solid var(--series); outline-offset: 2px; }
+  .type-row .box { width: 14px; height: 14px; border-radius: 4px; border: 1.5px solid var(--c); flex: none; display: grid; place-items: center; }
+  .type-row button[aria-pressed="true"] .box { background: var(--c); }
+  .type-row button[aria-pressed="true"] .box::after { content: ""; width: 6px; height: 3px; border: solid #fff; border-width: 0 0 1.5px 1.5px; transform: translateY(-1px) rotate(-45deg); }
+
+  .type-row .fill { height: 8px; background: var(--c); border-radius: 0 4px 4px 0; min-width: 1px; }
+  .type-row .muted { color: var(--muted); }
+  @media (max-width: 600px) { .type-list { grid-template-columns: minmax(120px, auto) 1fr auto auto; } .type-list .share { display: none; } }
   #chart { position: relative; }
   #chart svg { display: block; width: 100%; overflow: visible; touch-action: pan-y; }
   #chart svg:focus { outline: none; }
@@ -111,17 +163,20 @@
   .tick { fill: var(--muted); font-size: 11.5px; font-variant-numeric: tabular-nums; }
   .panel-title { fill: var(--text-2); font-size: 12px; }
   .direct { fill: var(--text); font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; }
-  .ref-label { fill: var(--text-2); font-size: 11.5px; }
+  .ref-label { fill: var(--text-2); font-size: 11.5px; font-variant-numeric: tabular-nums; }
 
   .tooltip { position: absolute; pointer-events: none; background: var(--surface); color: var(--text);
              border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; font-size: 13px;
-             box-shadow: 0 6px 24px rgba(0, 0, 0, 0.14); min-width: 210px; max-width: 280px; z-index: 2; }
+             box-shadow: 0 6px 24px var(--shadow); min-width: 220px; max-width: 300px; z-index: 2; }
   .tooltip[hidden] { display: none; }
   .tooltip .date { font-weight: 600; margin-bottom: 6px; }
   .tooltip dl { display: grid; grid-template-columns: auto auto; gap: 2px 16px; margin: 0; }
   .tooltip dt { color: var(--text-2); }
   .tooltip dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
   .tooltip .sw { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; vertical-align: 1px; }
+  .tooltip .ln { display: inline-block; width: 16px; margin-right: 6px; vertical-align: 3px; border-top: 2px solid var(--c); }
+  .tooltip .ln.dashed { border-top-style: dashed; }
+  .tooltip hr { grid-column: 1 / -1; width: 100%; border: 0; border-top: 1px solid var(--grid); margin: 4px 0; }
 
   .more { display: grid; gap: 12px; margin-top: 16px; }
   details { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 12px 16px; }
@@ -143,7 +198,10 @@
       <h1>Errors per page</h1>
       <p class="subtitle" id="subtitle">Pi and Claude Code reviews</p>
     </div>
-    <div class="status" id="status" data-state="connecting" role="status"><i aria-hidden="true"></i><span>Connecting…</span></div>
+    <div class="header-side">
+      <div class="status" id="status" data-state="connecting" role="status"><i aria-hidden="true"></i><span>Connecting…</span></div>
+      <button type="button" class="theme" id="theme">Light mode</button>
+    </div>
   </header>
 
   <div class="alert" id="alert" role="alert" hidden><strong>Some log rows could not be read</strong><ul></ul></div>
@@ -180,7 +238,8 @@
   </form>
 
   <section class="tiles" aria-label="Totals for the selected range">
-    <div class="tile hero"><div class="label">Errors per page</div><div class="value" id="t-rate">–</div><div class="note" id="t-rate-note">&nbsp;</div></div>
+    <div class="tile hero"><div class="label"><i class="key" aria-hidden="true"></i>Errors per page</div><div class="value" id="t-rate">–</div><div class="note" id="t-rate-note">&nbsp;</div></div>
+    <div class="tile hero"><div class="label"><i class="key dashed" aria-hidden="true"></i>Without spelling</div><div class="value" id="t-nospell">–</div><div class="note" id="t-nospell-note">&nbsp;</div></div>
     <div class="tile"><div class="label">Reviews</div><div class="value" id="t-reviews">–</div><div class="note" id="t-hosts">&nbsp;</div></div>
     <div class="tile"><div class="label">Reviewed pages</div><div class="value" id="t-pages">–</div><div class="note" id="t-chars">&nbsp;</div></div>
     <div class="tile"><div class="label">Errors</div><div class="value" id="t-errors">–</div><div class="note">suggestions excluded</div></div>
@@ -189,13 +248,19 @@
 
   <section class="card" aria-labelledby="chart-title">
     <h2 id="chart-title">Errors per page and reviewed pages</h2>
-    <div class="legend" aria-hidden="true">
-      <span><i class="key-line"></i>Errors per page</span>
-      <span><i class="key-ref"></i>Average over range</span>
+    <div class="legend" id="legend" role="group" aria-label="Lines shown on the chart"></div>
+    <div class="legend-static" aria-hidden="true">
+      <span><i class="key-ref"></i>Average over range, all errors</span>
       <span><i class="key-bar"></i>Reviewed pages</span>
     </div>
     <div id="chart"><div class="empty">Waiting for data…</div></div>
     <div class="tooltip" id="tooltip" hidden></div>
+  </section>
+
+  <section class="card types" aria-labelledby="types-title">
+    <h2 id="types-title">Errors by type</h2>
+    <p class="hint" id="types-hint">Errors per page in the selected range. Select a type to plot it.</p>
+    <div class="type-list" id="types"></div>
   </section>
 
   <section class="more">
@@ -218,8 +283,20 @@
 <script>
 "use strict";
 const $ = (selector) => document.querySelector(selector);
-const DEFAULTS = { range: "all", group: "day", source: "all", page: 1500 };
+const DEFAULTS = { range: "all", group: "day", source: "all", page: 1500, lines: "all,nospell" };
 const STORAGE_KEY = "corrective-feedback-dashboard";
+const THEME_KEY = "corrective-feedback-theme";
+const TYPES = {
+  spelling: "Spelling", grammar: "Grammar", prepositions: "Prepositions", articles: "Articles",
+  punctuation: "Punctuation & capitalization", idiom: "Idiom & word choice", word_order: "Word order", other: "Other",
+};
+// Every plottable line; colors follow the line, not its position.
+const SERIES = [
+  { key: "all", label: "All errors", color: "var(--series)", errors: (p) => p.errors },
+  { key: "nospell", label: "Without spelling", color: "var(--series)", dash: "6 4", errors: (p) => p.errors - p.types.spelling },
+  ...Object.entries(TYPES).map(([key, label]) => ({ key, label, color: `var(--c-${key})`, errors: (p) => p.types[key], type: true })),
+];
+const SERIES_BY_KEY = Object.fromEntries(SERIES.map((series) => [series.key, series]));
 const DAY_MS = 86400000;
 const HOST_NAMES = { all: "Pi and Claude Code", pi: "Pi", claude: "Claude Code" };
 
@@ -228,6 +305,7 @@ const fixed1 = new Intl.NumberFormat(undefined, { minimumFractionDigits: 1, maxi
 const fixed2 = new Intl.NumberFormat(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const esc = (value) => String(value).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 const rateText = (value) => value == null ? "–" : (value >= 10 ? fixed1 : fixed2).format(value);
+const percent = new Intl.NumberFormat(undefined, { style: "percent", maximumFractionDigits: 0 });
 const pagesText = (value) => value >= 100 ? number.format(Math.round(value)) : fixed1.format(value);
 
 // Dates are ISO strings handled as UTC midnights, so DST never shifts a day.
@@ -252,6 +330,8 @@ function normalize(raw) {
     group: ["day", "week", "month"].includes(raw.group) ? raw.group : DEFAULTS.group,
     source: ["all", "pi", "claude"].includes(raw.source) ? raw.source : DEFAULTS.source,
     page: Number.isFinite(page) && page >= 1 && page <= 1e6 ? page : DEFAULTS.page,
+    lines: typeof raw.lines === "string"
+      ? SERIES.filter((series) => raw.lines.split(",").includes(series.key)).map((series) => series.key).join(",") : DEFAULTS.lines,
   };
 }
 function loadSettings() {
@@ -262,10 +342,18 @@ function loadSettings() {
 }
 function saveSettings() {
   const params = new URLSearchParams();
-  for (const [key, value] of Object.entries(settings)) if (value !== DEFAULTS[key]) params.set(key, value);
+  for (const [key, value] of Object.entries(settings)) if (value !== DEFAULTS[key]) params.set(key, value || "none");
   const query = params.toString();
   history.replaceState(null, "", query ? `?${query}` : location.pathname);
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(settings)); } catch {}
+}
+const visibleSeries = () => SERIES.filter((series) => settings.lines.split(",").includes(series.key));
+function toggleLine(key) {
+  const keys = new Set(settings.lines.split(","));
+  keys.has(key) ? keys.delete(key) : keys.add(key);
+  settings = normalize({ ...settings, lines: [...keys].join(",") });
+  saveSettings();
+  render();
 }
 function syncControls() {
   const form = $("#controls");
@@ -289,7 +377,8 @@ function computeView() {
     const key = periodStart(date, s.group);
     let period = periods[periods.length - 1];
     if (!period || period.key !== key) {
-      period = { key, start: date, end: date, reviews: 0, characters: 0, errors: 0, pi: 0, claude: 0 };
+      period = { key, start: date, end: date, reviews: 0, characters: 0, errors: 0, pi: 0, claude: 0,
+                 types: Object.fromEntries(Object.keys(TYPES).map((type) => [type, 0])) };
       periods.push(period);
     }
     period.end = date;
@@ -298,15 +387,20 @@ function computeView() {
     period.reviews += day[field("reviewed_prompts")];
     period.characters += day[field("reviewed_characters")];
     period.errors += day[field("errors")];
+    const types = day[field("categories")] || {};
+    for (const type in period.types) period.types[type] += types[type] || 0;
     period.pi += s.source === "claude" ? 0 : day.pi_reviewed_prompts;
     period.claude += s.source === "pi" ? 0 : day.claude_reviewed_prompts;
   }
   const rate = (errors, characters) => characters ? errors * s.page / characters : null;
-  for (const p of periods) { p.rate = rate(p.errors, p.characters); p.pages = p.characters / s.page; }
   const sum = (key) => periods.reduce((total, p) => total + p[key], 0);
-  const totals = { reviews: sum("reviews"), characters: sum("characters"), errors: sum("errors"), pi: sum("pi"), claude: sum("claude") };
-  totals.rate = rate(totals.errors, totals.characters);
-  totals.pages = totals.characters / s.page;
+  const totals = { reviews: sum("reviews"), characters: sum("characters"), errors: sum("errors"), pi: sum("pi"), claude: sum("claude"),
+                   types: Object.fromEntries(Object.keys(TYPES).map((type) => [type, periods.reduce((total, p) => total + p.types[type], 0)])) };
+  for (const p of [...periods, totals]) {
+    p.pages = p.characters / s.page;
+    p.rates = Object.fromEntries(SERIES.map((series) => [series.key, rate(series.errors(p), p.characters)]));
+    p.rate = p.rates.all;
+  }
   return { periods, totals, start, end };
 }
 
@@ -351,7 +445,7 @@ function renderChart() {
   const periods = current.periods;
   const width = Math.max(host.clientWidth, 280);
   const narrow = width < 520;
-  const m = { left: narrow ? 36 : 48, right: narrow ? 40 : 64 };
+  const m = { left: narrow ? 36 : 48, right: narrow ? 52 : 72 };
   const rateTop = 22, rateH = narrow ? 200 : 250;
   const volTop = rateTop + rateH + 34, volH = narrow ? 64 : 80;
   const height = volTop + volH + 26;
@@ -360,9 +454,10 @@ function renderChart() {
   const col = plotW / n;
   const cx = (i) => m.left + col * (i + 0.5);
 
-  const rates = periods.map((p) => p.rate);
-  const overall = current.totals.rate;
-  const rateTicks = niceTicks(Math.max(0.5, overall ?? 0, ...rates.filter((v) => v != null)) * 1.12, narrow ? 3 : 4);
+  const lines = visibleSeries();
+  const overall = lines.some((series) => series.key === "all") ? current.totals.rate : null;
+  const peak = Math.max(0.5, overall ?? 0, ...lines.flatMap((series) => periods.map((p) => p.rates[series.key] ?? 0)));
+  const rateTicks = niceTicks(peak * 1.08, narrow ? 3 : 4);
   const rateMax = rateTicks[rateTicks.length - 1];
   const ry = (v) => rateTop + rateH - (v / rateMax) * rateH;
 
@@ -394,36 +489,47 @@ function renderChart() {
     parts.push(`<path data-bar="${i}" d="${roundedTop(cx(i) - barW / 2, y, barW, volTop + volH - y, 4)}" fill="var(--bar)"/>`);
   });
 
+  const labels = [];
   if (overall != null) {
-    parts.push(`<line x1="${m.left}" x2="${width - m.right}" y1="${ry(overall)}" y2="${ry(overall)}" stroke="var(--text-2)" stroke-width="1.5" stroke-dasharray="5 4"/>`);
-    parts.push(`<text class="ref-label" x="${width - m.right + 6}" y="${ry(overall) + 4}">${esc(rateText(overall))}</text>`);
+    parts.push(`<line x1="${m.left}" x2="${width - m.right}" y1="${ry(overall)}" y2="${ry(overall)}" stroke="var(--text-2)" stroke-width="1.5" stroke-dasharray="1.5 3.5" stroke-linecap="round"/>`);
+    labels.push({ y: ry(overall), text: narrow ? rateText(overall) : `avg ${rateText(overall)}`, cls: "ref-label" });
   }
 
-  // Rate line; periods without reviews break it.
-  let path = "";
-  rates.forEach((v, i) => {
-    if (v == null) return;
-    path += `${i && rates[i - 1] != null ? "L" : "M"}${cx(i).toFixed(1)},${ry(v).toFixed(1)}`;
-  });
-  parts.push(`<path d="${path}" fill="none" stroke="var(--series)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`);
-  const last = rates.findLastIndex((v) => v != null);
-  const isolated = (i) => (i === 0 || rates[i - 1] == null) && (i === n - 1 || rates[i + 1] == null);
-  rates.forEach((v, i) => {
-    if (v == null || !(col >= 12 || i === last || isolated(i))) return;
-    parts.push(`<circle cx="${cx(i)}" cy="${ry(v)}" r="4" fill="var(--series)" stroke="var(--surface)" stroke-width="2"/>`);
-  });
-  // Direct label on the latest value only; the tooltip and table carry the rest.
-  if (last >= 0) {
-    const y = ry(rates[last]);
-    const nearRef = overall != null && Math.abs(y - ry(overall)) < 14;
-    const above = y - 12 > rateTop;
-    parts.push(`<text class="direct" x="${cx(last)}" y="${nearRef || !above ? y + 20 : y - 12}" text-anchor="${last === n - 1 && col < 60 ? "end" : "middle"}">${esc(rateText(rates[last]))}</text>`);
+  // One line per visible series, the headline lines drawn last so they stay on top; empty periods break a line.
+  const isolatedIn = (rates, i) => (i === 0 || rates[i - 1] == null) && (i === n - 1 || rates[i + 1] == null);
+  for (const series of [...lines].reverse()) {
+    const rates = periods.map((p) => p.rates[series.key]);
+    let path = "";
+    rates.forEach((v, i) => {
+      if (v == null) return;
+      path += `${i && rates[i - 1] != null ? "L" : "M"}${cx(i).toFixed(1)},${ry(v).toFixed(1)}`;
+    });
+    parts.push(`<path d="${path}" fill="none" stroke="${series.color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"${series.dash ? ` stroke-dasharray="${series.dash}"` : ""}/>`);
+    const last = rates.findLastIndex((v) => v != null);
+    rates.forEach((v, i) => {
+      // Markers only where a line has no segment to show; hover adds the rest.
+      if (v == null || !(i === last || isolatedIn(rates, i))) return;
+      parts.push(`<circle cx="${cx(i)}" cy="${ry(v)}" r="${series.dash ? 3.5 : 4}" fill="${series.dash ? "var(--surface)" : series.color}" stroke="${series.dash ? series.color : "var(--surface)"}" stroke-width="2"/>`);
+    });
+    if (last >= 0) labels.push({ y: ry(rates[last]), text: rateText(rates[last]), cls: "direct", series });
+  }
+  // Latest values in the right margin, nudged apart so they never overlap.
+  labels.sort((a, b) => a.y - b.y);
+  for (let i = 1; i < labels.length; i++) labels[i].y = Math.max(labels[i].y, labels[i - 1].y + 14);
+  const overflow = labels.length ? labels[labels.length - 1].y - (rateTop + rateH) : 0;
+  if (overflow > 0) for (const label of labels) label.y = Math.max(rateTop, label.y - overflow);
+  for (const label of labels) {
+    const x = width - m.right + 8;
+    if (label.series) {
+      parts.push(`<line x1="${x}" x2="${x + 10}" y1="${label.y}" y2="${label.y}" stroke="${label.series.color}" stroke-width="2"${label.series.dash ? ` stroke-dasharray="3 2"` : ""}/>`);
+    }
+    parts.push(`<text class="${label.cls}" x="${label.series ? x + 14 : x}" y="${label.y + 4}">${esc(label.text)}</text>`);
   }
 
   parts.push(`<g id="hover"></g>`);
   host.innerHTML = `<svg viewBox="0 0 ${width} ${height}" height="${height}" tabindex="0" role="img"
-    aria-label="Errors per page by ${esc(settings.group)} over ${n} periods, with reviewed pages per ${esc(settings.group)}. Use the arrow keys to read individual periods; the table lists every value.">${parts.join("")}</svg>`;
-  geometry = { m, width, col, ry, rateTop, volTop, volH, n, cx };
+    aria-label="${esc(lines.map((series) => series.label).join(", ") || "No lines")}: errors per page by ${esc(settings.group)} over ${n} periods, with reviewed pages per ${esc(settings.group)}. Use the arrow keys to read individual periods; the table lists every value.">${parts.join("")}</svg>`;
+  geometry = { m, width, col, ry, rateTop, volTop, volH, n, cx, lines };
   const svg = host.querySelector("svg");
   svg.addEventListener("pointermove", (event) => {
     const box = svg.getBoundingClientRect();
@@ -450,20 +556,24 @@ function setActive(index) {
   svg.querySelectorAll("[data-bar]").forEach((bar) => bar.setAttribute("fill", +bar.dataset.bar === index ? "var(--bar-active)" : "var(--bar)"));
   const layer = svg.querySelector("#hover");
   if (index == null) { layer.innerHTML = ""; return hideTooltip(); }
-  const { cx, ry, rateTop, volTop, volH } = geometry;
+  const { cx, ry, rateTop, volTop, volH, lines } = geometry;
   const period = current.periods[index];
   const x = cx(index);
-  layer.innerHTML = `<line x1="${x}" x2="${x}" y1="${rateTop}" y2="${volTop + volH}" stroke="var(--axis)" stroke-width="1"/>` +
-    (period.rate == null ? "" : `<circle cx="${x}" cy="${ry(period.rate)}" r="5" fill="var(--series)" stroke="var(--surface)" stroke-width="2"/>`);
-  showTooltip(period, x, period.rate == null ? rateTop + 40 : ry(period.rate));
+  const dots = [...lines].reverse().filter((series) => period.rates[series.key] != null).map((series) =>
+    `<circle cx="${x}" cy="${ry(period.rates[series.key])}" r="5" fill="${series.dash ? "var(--surface)" : series.color}" stroke="${series.dash ? series.color : "var(--surface)"}" stroke-width="2"/>`);
+  layer.innerHTML = `<line x1="${x}" x2="${x}" y1="${rateTop}" y2="${volTop + volH}" stroke="var(--axis)" stroke-width="1"/>` + dots.join("");
+  const ys = lines.map((series) => period.rates[series.key]).filter((v) => v != null).map(ry);
+  showTooltip(period, x, ys.length ? ys.reduce((a, b) => a + b) / ys.length : rateTop + 40);
 }
 
 function showTooltip(p, x, y) {
   const tip = $("#tooltip");
   const hosts = settings.source === "all"
     ? `<dt>Pi · Claude</dt><dd>${esc(number.format(p.pi))} · ${esc(number.format(p.claude))}</dd>` : "";
+  const rows = geometry.lines.map((series) =>
+    `<dt><span class="ln${series.dash ? " dashed" : ""}" style="--c:${series.color}"></span>${esc(series.label)}</dt><dd>${p.rate == null ? "–" : esc(rateText(p.rates[series.key]))}</dd>`);
   tip.innerHTML = `<div class="date">${esc(periodLabel(p, true))}</div><dl>
-    <dt><span class="sw" style="background:var(--series)"></span>Errors per page</dt><dd>${p.rate == null ? "No reviews" : esc(rateText(p.rate))}</dd>
+    ${p.rate == null ? "<dt>No reviews</dt><dd></dd>" : rows.length ? `<dt class="muted">Errors per page</dt><dd></dd>${rows.join("")}<hr>` : ""}
     <dt>Errors</dt><dd>${esc(number.format(p.errors))}</dd>
     <dt><span class="sw" style="background:var(--bar)"></span>Pages</dt><dd>${esc(pagesText(p.pages))}</dd>
     <dt>Characters</dt><dd>${esc(number.format(p.characters))}</dd>
@@ -487,7 +597,9 @@ function tableColumns() {
   const columns = [
     ["Period", "period", (p) => periodLabel(p, true)],
     ["Errors / page", "errors_per_page", (p) => rateText(p.rate), (p) => p.rate ?? ""],
+    ["Without spelling", "errors_per_page_without_spelling", (p) => rateText(p.rates.nospell), (p) => p.rates.nospell ?? ""],
     ["Errors", "errors", (p) => number.format(p.errors), (p) => p.errors],
+    ...Object.entries(TYPES).map(([type, label]) => [label, `${type}_errors`, (p) => number.format(p.types[type]), (p) => p.types[type]]),
     ["Pages", "pages", (p) => pagesText(p.pages), (p) => +p.pages.toFixed(4)],
     ["Characters", "reviewed_characters", (p) => number.format(p.characters), (p) => p.characters],
     ["Reviews", "reviews", (p) => number.format(p.reviews), (p) => p.reviews],
@@ -505,6 +617,8 @@ function renderText() {
   $("#t-rate-note").textContent = `1 page = ${number.format(s.page)} characters`;
   const t = current?.totals;
   $("#t-rate").textContent = t ? rateText(t.rate) : "–";
+  $("#t-nospell").textContent = t ? rateText(t.rates.nospell) : "–";
+  $("#t-nospell-note").textContent = t && t.errors ? `spelling is ${percent.format(t.types.spelling / t.errors)} of errors` : "\u00a0";
   $("#t-reviews").textContent = t ? number.format(t.reviews) : "–";
   $("#t-hosts").textContent = t && s.source === "all" ? `Pi ${number.format(t.pi)} · Claude ${number.format(t.claude)}` : `${HOST_NAMES[s.source]} only`;
   $("#t-pages").textContent = t ? pagesText(t.pages) : "–";
@@ -513,6 +627,9 @@ function renderText() {
   $("#subtitle").textContent = current
     ? `${HOST_NAMES[s.source]} reviews, ${fmt(current.start, { year: "numeric", month: "short", day: "numeric" })} – ${fmt(current.end, { year: "numeric", month: "short", day: "numeric" })} (${data.timezone}) · 1 page = ${number.format(s.page)} characters`
     : `${HOST_NAMES[s.source]} reviews`;
+
+  renderLegend();
+  renderTypes();
 
   const columns = tableColumns();
   $("#table-head").innerHTML = `<tr>${columns.map(([label]) => `<th scope="col">${esc(label)}</th>`).join("")}</tr>`;
@@ -527,6 +644,34 @@ function renderText() {
   const alert = $("#alert");
   alert.hidden = !data.errors.length;
   alert.querySelector("ul").innerHTML = data.errors.map((e) => `<li>${esc(e)}</li>`).join("");
+}
+
+function renderLegend() {
+  const shown = new Set(settings.lines.split(","));
+  const chip = (series) => `<button type="button" class="chip" data-line="${series.key}" aria-pressed="${shown.has(series.key)}" style="--c:${series.color}">` +
+    `<i class="key${series.dash ? " dashed" : ""}" aria-hidden="true"></i>${esc(series.label)}</button>`;
+  $("#legend").innerHTML = SERIES.filter((series) => !series.type).map(chip).join("") + `<i class="sep" aria-hidden="true"></i>` +
+    SERIES.filter((series) => series.type).map(chip).join("");
+}
+
+function renderTypes() {
+  const t = current?.totals;
+  const host = $("#types");
+  if (!t || !t.characters) { host.innerHTML = ""; $("#types-hint").textContent = "No reviews in this range."; return; }
+  $("#types-hint").textContent = "Errors per page in the selected range. Select a type to plot it.";
+  const shown = new Set(settings.lines.split(","));
+  const types = SERIES.filter((series) => series.type).sort((a, b) => t.types[b.key] - t.types[a.key]);
+  const max = Math.max(...types.map((series) => t.rates[series.key]), 1e-9);
+  host.innerHTML = `<div class="head">Type</div><div class="head"></div><div class="head num">Errors / page</div><div class="head num">Errors</div><div class="head num share">Share</div>` +
+    types.map((series) => {
+      const count = t.types[series.key], value = t.rates[series.key];
+      return `<div class="type-row" style="--c:${series.color}">
+        <button type="button" data-line="${series.key}" aria-pressed="${shown.has(series.key)}"><span class="box" aria-hidden="true"></span>${esc(series.label)}</button>
+        <div class="track" aria-hidden="true">${count ? `<div class="fill" style="width:${(value / max * 100).toFixed(2)}%"></div>` : ""}</div>
+        <div class="num${count ? "" : " muted"}">${esc(rateText(value))}</div>
+        <div class="num${count ? "" : " muted"}">${esc(number.format(count))}</div>
+        <div class="num share muted">${t.errors ? esc(percent.format(count / t.errors)) : "–"}</div></div>`;
+    }).join("");
 }
 
 function downloadCsv(event) {
@@ -576,7 +721,7 @@ syncControls();
 $("#controls").addEventListener("input", (event) => {
   const form = event.currentTarget;
   if (event.target.name === "page" && !form.page.checkValidity()) return;
-  settings = normalize({ range: form.range.value, group: form.group.value, source: form.source.value, page: form.page.value });
+  settings = normalize({ ...settings, range: form.range.value, group: form.group.value, source: form.source.value, page: form.page.value });
   saveSettings();
   render();
 });
@@ -584,6 +729,26 @@ $("#controls").addEventListener("submit", (event) => event.preventDefault());
 $("#controls").page.addEventListener("blur", syncControls);
 $("#reset").addEventListener("click", () => { settings = { ...DEFAULTS }; syncControls(); saveSettings(); render(); });
 $("#download").addEventListener("click", downloadCsv);
+for (const id of ["#legend", "#types"]) {
+  $(id).addEventListener("click", (event) => {
+    const button = event.target.closest("[data-line]");
+    if (button) toggleLine(button.dataset.line);
+  });
+}
+
+// Dark by default; the light theme is opt-in and remembered by this browser.
+function applyTheme(theme) {
+  document.documentElement.dataset.theme = theme;
+  $("#theme").textContent = theme === "dark" ? "Light mode" : "Dark mode";
+}
+let theme = "dark";
+try { if (localStorage.getItem(THEME_KEY) === "light") theme = "light"; } catch {}
+applyTheme(theme);
+$("#theme").addEventListener("click", () => {
+  theme = theme === "dark" ? "light" : "dark";
+  applyTheme(theme);
+  try { localStorage.setItem(THEME_KEY, theme); } catch {}
+});
 
 const events = new EventSource("events");
 events.onmessage = (event) => receive(JSON.parse(event.data));

@@ -329,6 +329,13 @@ not needed when running `./dashboard.sh` directly.
 
 The page shows **errors per page**, where a page is 1,500 reviewed characters by default,
 next to the number of reviewed pages, totals, a table, and a CSV export of the current view.
+By default the chart draws two lines: all errors (solid) and errors excluding spelling
+(dashed). The chips above the chart, or the rows of **Errors by type** below it, add or remove
+a line per error type. Reviewers name categories freely, so the dashboard folds them into
+spelling, grammar, prepositions, articles, punctuation & capitalization, idiom & word choice,
+word order, and other; a name that mentions several types counts as the first one it names.
+The page opens in dark mode; **Light mode** in the header switches it.
+
 Controls above the chart set:
 
 - **Range:** the last 7, 30, or 90 days, the last 12 months, or all time.
@@ -336,7 +343,8 @@ Controls above the chart set:
 - **Source:** Pi and Claude Code together, or either one alone.
 - **Page size:** the number of characters per page.
 
-Settings are kept in the address bar (for example `?range=30&group=week&page=1000`), so a
+Settings, including the plotted lines, are kept in the address bar (for example
+`?range=30&group=week&page=1000&lines=all,grammar`), so a
 view can be bookmarked, and the browser also remembers your last choice. **Reset** restores
 the defaults.
 

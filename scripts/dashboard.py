@@ -20,7 +20,7 @@ from urllib.parse import urlsplit
 import webbrowser
 from zoneinfo import ZoneInfo
 
-from review_character_counts import ReviewCounts
+from review_character_counts import CATEGORIES, ReviewCounts
 
 PAGE = Path(__file__).resolve().with_name("dashboard.html")
 HOSTS = ("pi", "claude")
@@ -39,33 +39,40 @@ def local_zone():
     return zone, zone.tzname(None) or "local time"
 
 
+def empty_bucket():
+    return {"reviews": 0, "characters": 0, "errors": 0, "categories": dict.fromkeys(CATEGORIES, 0)}
+
+
 def daily_rows(reviews, zone):
     """One row per calendar day from the first to the last review, including empty days."""
-    buckets = defaultdict(lambda: {host: {"reviews": 0, "characters": 0, "errors": 0} for host in HOSTS})
+    buckets = defaultdict(lambda: {host: empty_bucket() for host in HOSTS})
     for review in reviews:
         stamp = datetime.fromisoformat(review["timestamp"].replace("Z", "+00:00"))
         bucket = buckets[stamp.astimezone(zone).date()][review["host"]]
         bucket["reviews"] += 1
         bucket["characters"] += review["characters"]
         bucket["errors"] += review["errors"]
+        for category, count in review.get("categories", {}).items():
+            bucket["categories"][category] += count
     if not buckets:
         return []
     first, last = min(buckets), max(buckets)
     rows = []
     for offset in range((last - first).days + 1):
         day = first + timedelta(days=offset)
-        by_host = buckets.get(day) or {host: {"reviews": 0, "characters": 0, "errors": 0} for host in HOSTS}
-        characters = sum(b["characters"] for b in by_host.values())
-        errors = sum(b["errors"] for b in by_host.values())
+        by_host = buckets.get(day) or {host: empty_bucket() for host in HOSTS}
         row = {
             "date": day.isoformat(),
             "reviewed_prompts": sum(b["reviews"] for b in by_host.values()),
-            "reviewed_characters": characters, "errors": errors,
+            "reviewed_characters": sum(b["characters"] for b in by_host.values()),
+            "errors": sum(b["errors"] for b in by_host.values()),
+            "categories": {c: sum(b["categories"][c] for b in by_host.values()) for c in CATEGORIES},
         }
         for host in HOSTS:
             row[f"{host}_reviewed_prompts"] = by_host[host]["reviews"]
             row[f"{host}_reviewed_characters"] = by_host[host]["characters"]
             row[f"{host}_errors"] = by_host[host]["errors"]
+            row[f"{host}_categories"] = by_host[host]["categories"]
         rows.append(row)
     return rows
 
@@ -79,6 +86,7 @@ def build_snapshot(counts, zone, zone_name):
         "updated": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "today": datetime.now(zone).date().isoformat(),
         "timezone": zone_name,
+        "categories": list(CATEGORIES),
         "days": daily_rows(recovered["reviews"], zone),
         "excluded_reviews": len(recovered["excluded"]),
         "exclusions_by_reason": dict(sorted(reasons.items())),
