@@ -4,28 +4,36 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Corrective feedback</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%231a1a19'/%3E%3Cpath d='M7 11l6 6 5-4 7 8' fill='none' stroke='%233987e5' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<script>
+  // Before first paint, so a remembered light theme never flashes dark.
+  try { if (localStorage.getItem("corrective-feedback-theme") === "light") document.documentElement.dataset.theme = "light"; } catch {}
+</script>
 <style>
   :root {
     color-scheme: light;
     --page: #f9f9f7;
     --surface: #fcfcfb;
+    --raised: #ffffff;
+    --sunken: #f0efec;
     --text: #0b0b0b;
     --text-2: #52514e;
+    --text-3: #6f6e69;
     --muted: #898781;
     --grid: #e1e0d9;
     --axis: #c3c2b7;
     --border: rgba(11, 11, 11, 0.10);
-    --control: #ffffff;
-    --control-on: #0b0b0b;
-    --control-on-text: #ffffff;
+    --border-strong: rgba(11, 11, 11, 0.20);
+    --hover: rgba(11, 11, 11, 0.045);
     --series: #2a78d6;
-    --bar: #9ec5f4;
-    --bar-active: #5598e7;
+    --bar: #d3d2ca;
+    --bar-active: #898781;
     --good: #0ca30c;
     --warning: #fab219;
     --critical: #d03b3b;
     --critical-wash: rgba(208, 59, 59, 0.08);
     --shadow: rgba(0, 0, 0, 0.14);
+    --lift: 0 1px 2px rgba(0, 0, 0, 0.10);
     /* Error types: fixed per type, so toggling lines never repaints the others. */
     --c-spelling: #eb6834;
     --c-grammar: #1baf7a;
@@ -35,25 +43,29 @@
     --c-idiom: #6250d6;
     --c-word_order: #e34948;
     --c-other: #898781;
-    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    /* Each platform's own UI face first; on Linux, a cleaner face than the usual fallback when one is installed. */
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, "Noto Sans", Ubuntu, Cantarell, system-ui, sans-serif;
   }
   :root[data-theme="dark"] {
     color-scheme: dark;
     --page: #0d0d0d;
     --surface: #1a1a19;
+    --raised: #2e2e2c;
+    --sunken: #121211;
     --text: #f0efec;
     --text-2: #c3c2b7;
+    --text-3: #9b9990;
     --grid: #2c2c2a;
     --axis: #383835;
     --border: rgba(255, 255, 255, 0.10);
-    --control: #232322;
-    --control-on: #f0efec;
-    --control-on-text: #0b0b0b;
+    --border-strong: rgba(255, 255, 255, 0.22);
+    --hover: rgba(255, 255, 255, 0.05);
     --series: #3987e5;
-    --bar: #1c5cab;
-    --bar-active: #5598e7;
+    --bar: #4a4946;
+    --bar-active: #a3a198;
     --critical-wash: rgba(208, 59, 59, 0.16);
     --shadow: rgba(0, 0, 0, 0.5);
+    --lift: none;
     --c-spelling: #d95926;
     --c-grammar: #199e70;
     --c-prepositions: #c98500;
@@ -63,166 +75,212 @@
     --c-word_order: #e66767;
   }
   * { box-sizing: border-box; }
-  body { margin: 0; background: var(--page); color: var(--text); line-height: 1.45; }
-  main { max-width: 1120px; margin: 0 auto; padding: 28px 16px 48px; }
-  header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 24px; }
-  h1 { font-size: 22px; font-weight: 650; margin: 0; letter-spacing: -0.01em; }
+  body { margin: 0; background: var(--page); color: var(--text); line-height: 1.45; -webkit-font-smoothing: antialiased; }
+  main { max-width: 1240px; margin: 0 auto; padding: 32px 20px 56px; }
+  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  :focus-visible { outline: 2px solid var(--series); outline-offset: 2px; }
+
+  .top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 24px; }
+  h1 { font-size: 24px; font-weight: 650; margin: 0; letter-spacing: -0.02em; line-height: 1.2; }
   .subtitle { color: var(--text-2); margin: 4px 0 0; font-size: 14px; }
-  .header-side { display: flex; align-items: center; gap: 16px; }
-  .theme { font: inherit; font-size: 13px; color: var(--text-2); background: var(--control); border: 1px solid var(--border);
-           border-radius: 8px; height: 30px; padding: 0 10px; cursor: pointer; }
-  .theme:hover { color: var(--text); }
-  .theme:focus-visible { outline: 2px solid var(--series); outline-offset: 2px; }
-  .status { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-2); white-space: nowrap; }
+  .top-side { display: flex; align-items: center; gap: 8px; }
+  .status { display: inline-flex; align-items: center; gap: 8px; height: 32px; padding: 0 12px 0 11px; border: 1px solid var(--border);
+            border-radius: 999px; background: var(--surface); font-size: 12.5px; color: var(--text-2); white-space: nowrap;
+            font-variant-numeric: tabular-nums; }
   .status i { width: 8px; height: 8px; border-radius: 50%; background: var(--warning); flex: none; }
   .status[data-state="live"] i { background: var(--good); box-shadow: 0 0 0 3px color-mix(in srgb, var(--good) 22%, transparent); }
   .status[data-state="offline"] i { background: var(--critical); }
   .status[data-state="live"] i.pulse { animation: pulse 1.2s ease-out; }
   @keyframes pulse { from { box-shadow: 0 0 0 0 color-mix(in srgb, var(--good) 60%, transparent); } to { box-shadow: 0 0 0 10px transparent; } }
   @media (prefers-reduced-motion: reduce) { .status i.pulse { animation: none; } }
+  .icon-button { display: inline-grid; place-items: center; width: 32px; height: 32px; padding: 0; color: var(--text-2); background: var(--surface);
+                 border: 1px solid var(--border); border-radius: 50%; cursor: pointer; }
+  .icon-button:hover { color: var(--text); border-color: var(--border-strong); }
+  /* The icon shows the theme a click switches to. */
+  .icon-button .moon, :root[data-theme="dark"] .icon-button .sun { display: block; }
+  .icon-button .sun, :root[data-theme="dark"] .icon-button .moon { display: none; }
 
-  .alert { margin: 20px 0 0; padding: 12px 14px; border-radius: 10px; background: var(--critical-wash);
+  .alert { margin: 20px 0 0; padding: 12px 14px; border-radius: 12px; background: var(--critical-wash);
            border: 1px solid color-mix(in srgb, var(--critical) 40%, transparent); font-size: 14px; }
   .alert strong { display: flex; align-items: center; gap: 8px; }
   .alert strong::before { content: "!"; display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%;
                           background: var(--critical); color: #fff; font-size: 12px; font-weight: 700; }
   .alert ul { margin: 6px 0 0; padding-left: 26px; color: var(--text-2); }
 
-  .controls { display: flex; flex-wrap: wrap; align-items: end; gap: 12px 16px; margin: 22px 0 0; }
-  .control { display: grid; gap: 4px; font-size: 12.5px; color: var(--text-2); }
-  .control select, .control input, .segmented label, .controls button {
-    font: inherit; font-size: 14px; color: var(--text); background: var(--control);
-    border: 1px solid var(--border); border-radius: 8px; height: 34px; }
-  .control select { padding: 0 28px 0 10px; }
-  .control input { width: 92px; padding: 0 10px; font-variant-numeric: tabular-nums; }
-  .control input:invalid { border-color: var(--critical); }
-  .with-unit { display: flex; align-items: center; gap: 8px; color: var(--text-2); font-size: 14px; }
-  .segmented { display: flex; }
-  .segmented label { position: relative; display: inline-flex; align-items: center; padding: 0 12px; cursor: pointer; border-radius: 0; margin-left: -1px; }
-  .segmented label:first-of-type { border-radius: 8px 0 0 8px; margin-left: 0; }
-  .segmented label:last-of-type { border-radius: 0 8px 8px 0; }
+  /* Filters: one row above everything they scope. */
+  .controls { display: flex; flex-wrap: wrap; align-items: end; gap: 14px 20px; margin: 24px 0 20px; }
+  .control { display: grid; gap: 6px; font-size: 12px; color: var(--text-3); }
+  .segmented { display: inline-flex; gap: 2px; padding: 3px; background: var(--sunken); border: 1px solid var(--border); border-radius: 10px; }
+  .segmented label { position: relative; display: inline-flex; align-items: center; justify-content: center; min-width: 38px; height: 28px;
+                     padding: 0 11px; border-radius: 7px; font-size: 13px; color: var(--text-2); white-space: nowrap; cursor: pointer; }
+  .segmented label:hover { color: var(--text); }
   .segmented input { position: absolute; opacity: 0; pointer-events: none; }
-  .segmented label:has(input:checked) { background: var(--control-on); color: var(--control-on-text); border-color: var(--control-on); }
-  .segmented label:has(input:focus-visible), .control select:focus-visible, .control input:focus-visible, .controls button:focus-visible {
-    outline: 2px solid var(--series); outline-offset: 2px; }
-  .controls button { padding: 0 12px; cursor: pointer; color: var(--text-2); }
-  .controls button:hover { color: var(--text); }
+  .segmented label:has(input:checked) { background: var(--raised); color: var(--text); box-shadow: 0 0 0 1px var(--border), var(--lift); }
+  .segmented label:has(input:focus-visible) { outline: 2px solid var(--series); outline-offset: 1px; }
+  .field { display: inline-flex; align-items: center; height: 36px; padding-right: 12px; background: var(--sunken); border: 1px solid var(--border);
+           border-radius: 10px; font-size: 13px; color: var(--text-3); }
+  .field input { width: 78px; min-width: 3ch; height: 100%; padding: 0 8px 0 12px; font: inherit; font-size: 13.5px; color: var(--text); background: none; border: 0;
+                 outline: 0; font-variant-numeric: tabular-nums; appearance: textfield; -moz-appearance: textfield; }
+  .field input::-webkit-inner-spin-button, .field input::-webkit-outer-spin-button { appearance: none; margin: 0; }
+  .field:focus-within { outline: 2px solid var(--series); outline-offset: 1px; }
+  .field:has(input:invalid) { border-color: var(--critical); }
+  .ghost { height: 36px; padding: 0 12px; font: inherit; font-size: 13px; color: var(--text-2); background: none; border: 0; border-radius: 10px; cursor: pointer; }
+  .ghost:hover { color: var(--text); background: var(--hover); }
+  .ghost:disabled { color: var(--muted); opacity: 0.5; background: none; cursor: default; }
 
-  .tiles { display: grid; grid-template-columns: 1.3fr 1.3fr repeat(4, 1fr); gap: 12px; margin: 18px 0 16px; }
-  .tile { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; min-width: 0; }
-  .tile .label { font-size: 13px; color: var(--text-2); }
-  .tile .value { font-size: 26px; font-weight: 600; margin-top: 2px; overflow-wrap: anywhere; }
-  .tile .label .key { display: inline-block; width: 16px; vertical-align: 4px; margin-right: 6px; border-top: 2px solid var(--series); }
-  .tile .label .key.dashed { border-top-style: dashed; }
-  .tile.hero .value { font-size: 44px; line-height: 1.05; letter-spacing: -0.02em; }
-  .tile .note { font-size: 12.5px; color: var(--muted); margin-top: 2px; }
-  @media (max-width: 960px) { .tiles { grid-template-columns: repeat(2, 1fr); } }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; }
+  h2 { font-size: 14.5px; font-weight: 600; margin: 0; }
+  .hint { font-size: 12.5px; color: var(--text-3); margin: 2px 0 0; }
 
-  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px 16px 10px; position: relative; }
-  .card h2 { font-size: 15px; font-weight: 600; margin: 0 0 4px; }
-  .legend { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 4px; }
-  .chip { display: inline-flex; align-items: center; gap: 7px; font: inherit; font-size: 13px; color: var(--muted);
-          background: transparent; border: 1px solid var(--border); border-radius: 999px; height: 28px; padding: 0 11px; cursor: pointer; }
-  .chip:hover { color: var(--text-2); border-color: color-mix(in srgb, var(--text) 25%, transparent); }
-  .chip[aria-pressed="true"] { color: var(--text); background: var(--control); border-color: color-mix(in srgb, var(--text) 22%, transparent); }
-  .chip:focus-visible { outline: 2px solid var(--series); outline-offset: 2px; }
-  .chip .key { width: 16px; border-top: 2px solid var(--c); opacity: 0.35; }
+  /* The main card: headline figures over the chart, error types beside it. */
+  .main { display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 420px); }
+  .plot { position: relative; min-width: 0; padding: 20px 20px 10px; }
+  .types { min-width: 0; padding: 20px; border-left: 1px solid var(--border); }
+  @media (max-width: 940px) {
+    .main { grid-template-columns: minmax(0, 1fr); }
+    .types { border-left: 0; border-top: 1px solid var(--border); }
+  }
+
+  /* Two figures on one baseline; each one's chip is the legend entry and toggle for its line. */
+  .figures { display: grid; grid-template-columns: repeat(2, minmax(0, max-content)); grid-template-rows: repeat(3, auto); grid-auto-flow: column;
+             column-gap: 40px; align-items: baseline; margin-bottom: 12px; }
+  .figure { display: contents; }
+  .figure .value { margin-top: 12px; font-size: 34px; font-weight: 600; line-height: 1; letter-spacing: -0.02em; }
+  .figure.hero .value { font-size: 56px; letter-spacing: -0.03em; }
+  .figure .note { margin-top: 6px; font-size: 12.5px; color: var(--text-3); }
+  .chip { display: inline-flex; align-items: center; gap: 8px; justify-self: start; height: 28px; padding: 0 12px 0 10px; font: inherit; font-size: 13px;
+          color: var(--text-3); background: none; border: 1px solid var(--border); border-radius: 999px; white-space: nowrap; cursor: pointer; }
+  .chip:hover { color: var(--text); border-color: var(--border-strong); }
+  .chip[aria-pressed="true"] { color: var(--text); background: var(--sunken); }
+  .chip .key { width: 16px; border-top: 2px solid var(--series); opacity: 0.35; }
   .chip .key.dashed { border-top-style: dashed; }
   .chip[aria-pressed="true"] .key { opacity: 1; }
-  .legend .sep { width: 1px; background: var(--border); margin: 4px 4px; }
-  .legend-static { display: flex; flex-wrap: wrap; gap: 4px 18px; font-size: 12.5px; color: var(--text-2); margin: 2px 0 4px; }
-  .legend-static span { display: inline-flex; align-items: center; gap: 6px; }
-  .key-ref { width: 16px; border-top: 1.5px dotted var(--text-2); }
-  .key-bar { width: 10px; height: 10px; background: var(--bar); border-radius: 2px; }
-  .hint { font-size: 12.5px; color: var(--muted); margin: 0; }
+  @media (max-width: 520px) {
+    main { padding: 20px 14px 40px; }
+    .plot { padding: 16px 14px 8px; }
+    .types { padding: 16px 14px; }
+    .figures { column-gap: 16px; }
+    .chip { gap: 6px; padding: 0 9px 0 8px; font-size: 12.5px; }
+    .chip .key { width: 12px; }
+    .figure.hero .value { font-size: 48px; }
+    .figure .value { font-size: 30px; }
+  }
 
-  .types { margin-top: 16px; }
-  .type-list { display: grid; grid-template-columns: minmax(150px, auto) 1fr auto auto auto; gap: 0 14px; align-items: stretch; margin-top: 8px;
-               font-size: 13.5px; font-variant-numeric: tabular-nums; }
-  .type-list .head { font-size: 12px; color: var(--muted); padding-bottom: 4px; border-bottom: 1px solid var(--grid); }
-  .type-list .head.num, .type-list .num { text-align: right; }
-  .type-row { display: contents; }
-  .type-row > * { display: flex; align-items: center; padding: 5px 0; border-bottom: 1px solid var(--grid); }
-  .type-row > .num { justify-content: flex-end; }
-  .type-row button { display: flex; align-items: center; gap: 8px; font: inherit; color: var(--text); background: none; border: 0;
-                     padding: 5px 0; cursor: pointer; text-align: left; border-bottom: 1px solid var(--grid); border-radius: 0; }
-  .type-row button:focus-visible { outline: 2px solid var(--series); outline-offset: 2px; }
-  .type-row .box { width: 14px; height: 14px; border-radius: 4px; border: 1.5px solid var(--c); flex: none; display: grid; place-items: center; }
-  .type-row button[aria-pressed="true"] .box { background: var(--c); }
-  .type-row button[aria-pressed="true"] .box::after { content: ""; width: 6px; height: 3px; border: solid #fff; border-width: 0 0 1.5px 1.5px; transform: translateY(-1px) rotate(-45deg); }
-
-  .type-row .fill { height: 8px; background: var(--c); border-radius: 0 4px 4px 0; min-width: 1px; }
-  .type-row .muted { color: var(--muted); }
-  @media (max-width: 600px) { .type-list { grid-template-columns: minmax(120px, auto) 1fr auto auto; } .type-list .share { display: none; } }
-  #chart { position: relative; }
   #chart svg { display: block; width: 100%; overflow: visible; touch-action: pan-y; }
   #chart svg:focus { outline: none; }
   #chart svg:focus-visible { outline: 2px solid var(--series); outline-offset: 4px; border-radius: 4px; }
-  .empty { padding: 72px 16px; text-align: center; color: var(--text-2); }
+  .empty { padding: 96px 16px; text-align: center; color: var(--text-2); font-size: 14px; }
   svg text { font-family: inherit; }
   .tick { fill: var(--muted); font-size: 11.5px; font-variant-numeric: tabular-nums; }
-  .panel-title { fill: var(--text-2); font-size: 12px; }
+  .panel-title { fill: var(--text-3); font-size: 12px; }
   .direct { fill: var(--text); font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; }
-  .ref-label { fill: var(--text-2); font-size: 11.5px; font-variant-numeric: tabular-nums; }
+  .ref-label { fill: var(--text-3); font-size: 11.5px; font-variant-numeric: tabular-nums; }
 
   .tooltip { position: absolute; pointer-events: none; background: var(--surface); color: var(--text);
-             border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; font-size: 13px;
-             box-shadow: 0 6px 24px var(--shadow); min-width: 220px; max-width: 300px; z-index: 2; }
+             border: 1px solid var(--border-strong); border-radius: 10px; padding: 10px 12px; font-size: 12.5px;
+             box-shadow: 0 8px 28px var(--shadow); min-width: 210px; max-width: 300px; z-index: 2; }
   .tooltip[hidden] { display: none; }
-  .tooltip .date { font-weight: 600; margin-bottom: 6px; }
-  .tooltip dl { display: grid; grid-template-columns: auto auto; gap: 2px 16px; margin: 0; }
+  .tooltip .date { font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+  .tooltip .none { color: var(--text-2); }
+  .tooltip dl { display: grid; grid-template-columns: 1fr auto; gap: 3px 20px; margin: 0; }
   .tooltip dt { color: var(--text-2); }
-  .tooltip dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
-  .tooltip .sw { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; vertical-align: 1px; }
-  .tooltip .ln { display: inline-block; width: 16px; margin-right: 6px; vertical-align: 3px; border-top: 2px solid var(--c); }
+  .tooltip dd { margin: 0; text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .tooltip .caption { grid-column: 1 / -1; font-size: 11.5px; color: var(--text-3); }
+  .tooltip .sw { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin: 0 9px 0 3px; background: var(--bar-active); }
+  .tooltip .ln { display: inline-block; width: 14px; margin-right: 6px; vertical-align: 3px; border-top: 2px solid var(--c); }
   .tooltip .ln.dashed { border-top-style: dashed; }
   .tooltip hr { grid-column: 1 / -1; width: 100%; border: 0; border-top: 1px solid var(--grid); margin: 4px 0; }
 
-  .more { display: grid; gap: 12px; margin-top: 16px; }
-  details { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 12px 16px; }
-  summary { cursor: pointer; font-weight: 600; font-size: 14px; }
-  .scroll { overflow-x: auto; margin-top: 10px; max-height: 420px; overflow-y: auto; }
+  /* Error types: a meter per row, and the legend and toggle for that type's line. */
+  .type-list { display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto; column-gap: 14px; margin: 14px -10px -8px; }
+  .type-head, .type-row { display: grid; grid-template-columns: subgrid; grid-column: 1 / -1; }
+  .type-head { padding: 0 10px 4px; font-size: 11.5px; color: var(--muted); }
+  .type-row { align-items: center; row-gap: 8px; padding: 9px 10px 11px; font: inherit; font-size: 13.5px; color: var(--text); text-align: left;
+              background: none; border: 0; border-radius: 9px; cursor: pointer; }
+  .type-row:hover { background: var(--hover); }
+  .type-row:focus-visible { outline-offset: -2px; }
+  .type-row .name { display: flex; align-items: center; gap: 9px; min-width: 0; }
+  .num { text-align: right; font-variant-numeric: tabular-nums; }
+  .type-row .rate { font-weight: 600; }
+  .type-row .count, .type-row .share { color: var(--text-3); }
+  .type-row.zero, .type-row.zero .rate { color: var(--muted); font-weight: 400; }
+  .type-row .box { display: grid; place-items: center; flex: none; width: 14px; height: 14px; border: 1.5px solid var(--c); border-radius: 4px; }
+  .type-row[aria-pressed="true"] .box { background: var(--c); }
+  .type-row[aria-pressed="true"] .box::after { content: ""; width: 6px; height: 3px; border: solid #fff; border-width: 0 0 1.5px 1.5px; transform: translateY(-1px) rotate(-45deg); }
+  .type-row .track { grid-column: 1 / -1; height: 4px; margin-left: 23px; border-radius: 2px; background: var(--grid); overflow: hidden; }
+  .type-row .fill { display: block; height: 100%; min-width: 2px; border-radius: 2px; background: var(--c); }
+
+  .stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin-top: 16px; }
+  .stat { padding: 16px 20px 15px; border-left: 1px solid var(--border); min-width: 0; }
+  .stat:first-child { border-left: 0; }
+  .stat .label { font-size: 13px; color: var(--text-2); }
+  .stat .value { margin-top: 2px; font-size: 24px; font-weight: 600; letter-spacing: -0.01em; overflow-wrap: anywhere; }
+  .stat .note { font-size: 12.5px; color: var(--text-3); }
+  @media (max-width: 760px) {
+    .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .stat:nth-child(odd) { border-left: 0; }
+    .stat:nth-child(n + 3) { border-top: 1px solid var(--border); }
+  }
+
+  .more { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; margin-top: 16px; }
+  details { padding: 0 20px; }
+  summary { display: flex; align-items: center; gap: 10px; padding: 14px 0; font-size: 14px; font-weight: 600; cursor: pointer; list-style: none; border-radius: 6px; }
+  summary::-webkit-details-marker { display: none; }
+  summary::before { content: ""; width: 6px; height: 6px; margin: 0 3px 0 2px; border: solid var(--muted); border-width: 0 1.5px 1.5px 0;
+                    transform: rotate(-45deg); transition: transform 0.15s; }
+  details[open] summary::before { transform: translateY(-2px) rotate(45deg); }
+  @media (prefers-reduced-motion: reduce) { summary::before { transition: none; } }
+  details > :last-child:not(summary) { margin-bottom: 16px; }
+  .scroll { overflow: auto; max-height: 420px; }
   table { border-collapse: collapse; width: 100%; font-size: 13px; font-variant-numeric: tabular-nums; }
-  th, td { padding: 6px 10px; text-align: right; border-bottom: 1px solid var(--grid); white-space: nowrap; }
-  th { position: sticky; top: 0; background: var(--surface); color: var(--text-2); font-weight: 600; }
-  th:first-child, td:first-child { text-align: left; }
+  th, td { padding: 7px 10px; text-align: right; border-bottom: 1px solid var(--grid); white-space: nowrap; }
+  th { position: sticky; top: 0; background: var(--surface); color: var(--text-3); font-size: 12px; font-weight: 500; box-shadow: 0 1px 0 var(--grid); }
+  th:first-child, td:first-child { text-align: left; padding-left: 0; }
+  tbody tr:hover td { background: var(--hover); }
+  .sources, .reasons { margin: 0 0 8px; padding-left: 18px; }
   .sources li, .reasons li { font-size: 13px; color: var(--text-2); overflow-wrap: anywhere; }
-  .sources code { color: var(--text); }
-  a { color: var(--series); }
+  .sources code { color: var(--text); font-size: 12.5px; }
+  a { color: var(--series); text-underline-offset: 2px; }
+  details p { margin: 12px 0 0; font-size: 13px; }
 </style>
 </head>
 <body>
 <main>
-  <header>
+  <header class="top">
     <div>
       <h1>Errors per page</h1>
       <p class="subtitle" id="subtitle">Pi and Claude Code reviews</p>
     </div>
-    <div class="header-side">
+    <div class="top-side">
       <div class="status" id="status" data-state="connecting" role="status"><i aria-hidden="true"></i><span>Connecting…</span></div>
-      <button type="button" class="theme" id="theme">Light mode</button>
+      <button type="button" class="icon-button" id="theme">
+        <svg class="sun" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+        <svg class="moon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.5 14.5A8.5 8.5 0 0 1 9.5 3.5a8.5 8.5 0 1 0 11 11z"/></svg>
+      </button>
     </div>
   </header>
 
   <div class="alert" id="alert" role="alert" hidden><strong>Some log rows could not be read</strong><ul></ul></div>
 
   <form class="controls" id="controls" aria-label="View settings">
-    <label class="control">Range
-      <select name="range">
-        <option value="7">Last 7 days</option>
-        <option value="30">Last 30 days</option>
-        <option value="90">Last 90 days</option>
-        <option value="365">Last 12 months</option>
-        <option value="all">All time</option>
-      </select>
-    </label>
-    <label class="control">Group by
-      <select name="group">
-        <option value="day">Day</option>
-        <option value="week">Week</option>
-        <option value="month">Month</option>
-      </select>
-    </label>
+    <div class="control">
+      <span id="range-label">Range</span>
+      <div class="segmented" role="radiogroup" aria-labelledby="range-label">
+        <label title="Last 7 days"><input type="radio" name="range" value="7" aria-label="Last 7 days">7d</label>
+        <label title="Last 30 days"><input type="radio" name="range" value="30" aria-label="Last 30 days">30d</label>
+        <label title="Last 90 days"><input type="radio" name="range" value="90" aria-label="Last 90 days">90d</label>
+        <label title="Last 12 months"><input type="radio" name="range" value="365" aria-label="Last 12 months">12m</label>
+        <label title="All time"><input type="radio" name="range" value="all" aria-label="All time">All</label>
+      </div>
+    </div>
+    <div class="control">
+      <span id="group-label">Group by</span>
+      <div class="segmented" role="radiogroup" aria-labelledby="group-label">
+        <label><input type="radio" name="group" value="day">Day</label>
+        <label><input type="radio" name="group" value="week">Week</label>
+        <label><input type="radio" name="group" value="month">Month</label>
+      </div>
+    </div>
     <div class="control">
       <span id="source-label">Source</span>
       <div class="segmented" role="radiogroup" aria-labelledby="source-label">
@@ -232,39 +290,45 @@
       </div>
     </div>
     <label class="control">Page size
-      <span class="with-unit"><input name="page" type="number" min="1" max="1000000" step="1" inputmode="numeric" required>characters</span>
+      <span class="field"><input name="page" type="number" min="1" max="1000000" step="1" inputmode="numeric" required>characters</span>
     </label>
-    <button type="button" id="reset">Reset</button>
+    <button type="button" class="ghost" id="reset">Reset</button>
   </form>
 
-  <section class="tiles" aria-label="Totals for the selected range">
-    <div class="tile hero"><div class="label"><i class="key" aria-hidden="true"></i>Errors per page</div><div class="value" id="t-rate">–</div><div class="note" id="t-rate-note">&nbsp;</div></div>
-    <div class="tile hero"><div class="label"><i class="key dashed" aria-hidden="true"></i>Without spelling</div><div class="value" id="t-nospell">–</div><div class="note" id="t-nospell-note">&nbsp;</div></div>
-    <div class="tile"><div class="label">Reviews</div><div class="value" id="t-reviews">–</div><div class="note" id="t-hosts">&nbsp;</div></div>
-    <div class="tile"><div class="label">Reviewed pages</div><div class="value" id="t-pages">–</div><div class="note" id="t-chars">&nbsp;</div></div>
-    <div class="tile"><div class="label">Errors</div><div class="value" id="t-errors">–</div><div class="note">suggestions excluded</div></div>
-    <div class="tile"><div class="label">Excluded reviews</div><div class="value" id="t-excluded">–</div><div class="note">all time, text not recoverable</div></div>
-  </section>
-
-  <section class="card" aria-labelledby="chart-title">
-    <h2 id="chart-title">Errors per page and reviewed pages</h2>
-    <div class="legend" id="legend" role="group" aria-label="Lines shown on the chart"></div>
-    <div class="legend-static" aria-hidden="true">
-      <span><i class="key-ref"></i>Average over range, all errors</span>
-      <span><i class="key-bar"></i>Reviewed pages</span>
+  <section class="card main">
+    <div class="plot">
+      <h2 class="sr" id="chart-title">Errors per page over time</h2>
+      <div class="figures" id="figures" role="group" aria-label="Errors per page in the selected range, and the lines shown for them">
+        <div class="figure hero">
+          <button type="button" class="chip" data-line="all" aria-pressed="true"><i class="key" aria-hidden="true"></i>All errors</button>
+          <div class="value" id="t-rate">–</div>
+          <div class="note" id="t-rate-note">&nbsp;</div>
+        </div>
+        <div class="figure">
+          <button type="button" class="chip" data-line="nospell" aria-pressed="true"><i class="key dashed" aria-hidden="true"></i>Without spelling</button>
+          <div class="value" id="t-nospell">–</div>
+          <div class="note" id="t-nospell-note">&nbsp;</div>
+        </div>
+      </div>
+      <div id="chart"><div class="empty">Waiting for data…</div></div>
+      <div class="tooltip" id="tooltip" hidden></div>
     </div>
-    <div id="chart"><div class="empty">Waiting for data…</div></div>
-    <div class="tooltip" id="tooltip" hidden></div>
+    <aside class="types" aria-labelledby="types-title">
+      <h2 id="types-title">Errors by type</h2>
+      <p class="hint" id="types-hint">Select a type to plot its line.</p>
+      <div class="type-list" id="types"></div>
+    </aside>
   </section>
 
-  <section class="card types" aria-labelledby="types-title">
-    <h2 id="types-title">Errors by type</h2>
-    <p class="hint" id="types-hint">Errors per page in the selected range. Select a type to plot it.</p>
-    <div class="type-list" id="types"></div>
+  <section class="card stats" aria-label="Totals for the selected range">
+    <div class="stat"><div class="label">Reviews</div><div class="value" id="t-reviews">–</div><div class="note" id="t-hosts">&nbsp;</div></div>
+    <div class="stat"><div class="label">Reviewed pages</div><div class="value" id="t-pages">–</div><div class="note" id="t-chars">&nbsp;</div></div>
+    <div class="stat"><div class="label">Errors</div><div class="value" id="t-errors">–</div><div class="note">suggestions excluded</div></div>
+    <div class="stat"><div class="label">Excluded reviews</div><div class="value" id="t-excluded">–</div><div class="note">all time, text not recoverable</div></div>
   </section>
 
   <section class="more">
-    <details id="table-view">
+    <details class="card" id="table-view">
       <summary>Table</summary>
       <div class="scroll"><table>
         <thead id="table-head"></thead>
@@ -272,7 +336,7 @@
       </table></div>
       <p><a href="#" id="download">Download this view as CSV</a></p>
     </details>
-    <details>
+    <details class="card">
       <summary>Sources and exclusions</summary>
       <ul class="sources" id="sources"></ul>
       <ul class="reasons" id="reasons"></ul>
@@ -346,6 +410,10 @@ function saveSettings() {
   const query = params.toString();
   history.replaceState(null, "", query ? `?${query}` : location.pathname);
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(settings)); } catch {}
+  syncReset();
+}
+function syncReset() {
+  $("#reset").disabled = Object.keys(DEFAULTS).every((key) => settings[key] === DEFAULTS[key]);
 }
 const visibleSeries = () => SERIES.filter((series) => settings.lines.split(",").includes(series.key));
 function toggleLine(key) {
@@ -361,6 +429,12 @@ function syncControls() {
   form.group.value = settings.group;
   form.source.value = settings.source;
   if (Number(form.page.value) !== settings.page) form.page.value = settings.page;
+  sizePageInput();
+}
+// The number sits next to its unit: the input is only as wide as its digits.
+function sizePageInput() {
+  const input = $("#controls").page;
+  input.style.width = `calc(${Math.max(1, input.value.length)}ch + 22px)`;
 }
 
 // ---- Aggregation for the current settings.
@@ -415,21 +489,23 @@ function periodLabel(p, long) {
 }
 
 // ---- Chart.
-function niceTicks(max, count) {
-  const raw = max / count;
+// A scale from 0 with gridlines at round values. It ends on a gridline when one is close above
+// the peak, and just past the peak otherwise, so no empty band is drawn over the data.
+function scaleTo(peak, count) {
+  const raw = peak / count;
   const power = 10 ** Math.floor(Math.log10(raw));
-  const step = [1, 2, 2.5, 5, 10].map((m) => m * power).find((s) => s >= raw);
-  const top = Math.ceil(max / step - 1e-9) * step;
+  const step = (raw / power >= 7.07 ? 10 : raw / power >= 3.16 ? 5 : raw / power >= 1.41 ? 2 : 1) * power;
+  const top = Math.ceil(peak / step - 1e-9) * step;
+  const max = top <= peak * 1.25 ? top : peak * 1.08;
   const ticks = [];
-  for (let v = 0; v <= top + step / 2; v += step) ticks.push(+v.toFixed(10));
-  return ticks;
+  for (let v = 0; v <= max * (1 + 1e-9); v += step) ticks.push(+v.toFixed(10));
+  return { max, ticks };
 }
 function roundedTop(x, y, w, h, r) {
   if (h <= 0) return "";
   r = Math.min(r, w / 2, h);
   return `M${x},${y + h}V${y + r}Q${x},${y} ${x + r},${y}H${x + w - r}Q${x + w},${y} ${x + w},${y + r}V${y + h}Z`;
 }
-
 function renderChart() {
   const host = $("#chart");
   if (!current) {
@@ -445,9 +521,9 @@ function renderChart() {
   const periods = current.periods;
   const width = Math.max(host.clientWidth, 280);
   const narrow = width < 520;
-  const m = { left: narrow ? 36 : 48, right: narrow ? 52 : 72 };
-  const rateTop = 22, rateH = narrow ? 200 : 250;
-  const volTop = rateTop + rateH + 34, volH = narrow ? 64 : 80;
+  const m = { left: narrow ? 34 : 40, right: narrow ? 50 : 70 };
+  const rateTop = 10, rateH = narrow ? 190 : 250;
+  const volTop = rateTop + rateH + 46, volH = narrow ? 52 : 64;
   const height = volTop + volH + 26;
   const plotW = width - m.left - m.right;
   const n = periods.length;
@@ -456,25 +532,21 @@ function renderChart() {
 
   const lines = visibleSeries();
   const overall = lines.some((series) => series.key === "all") ? current.totals.rate : null;
-  const peak = Math.max(0.5, overall ?? 0, ...lines.flatMap((series) => periods.map((p) => p.rates[series.key] ?? 0)));
-  const rateTicks = niceTicks(peak * 1.08, narrow ? 3 : 4);
-  const rateMax = rateTicks[rateTicks.length - 1];
-  const ry = (v) => rateTop + rateH - (v / rateMax) * rateH;
+  const rates = scaleTo(Math.max(0.5, overall ?? 0, ...lines.flatMap((series) => periods.map((p) => p.rates[series.key] ?? 0))), 3);
+  const ry = (v) => rateTop + rateH - (v / rates.max) * rateH;
+  const volumes = scaleTo(Math.max(0.1, ...periods.map((p) => p.pages)), 2);
+  const vy = (v) => volTop + volH - (v / volumes.max) * volH;
 
-  const pages = periods.map((p) => p.pages);
-  const volTicks = niceTicks(Math.max(0.1, ...pages), 2);
-  const volMax = volTicks[volTicks.length - 1];
-  const vy = (v) => volTop + volH - (v / volMax) * volH;
-
-  const parts = [];
-  for (const [ticks, y] of [[rateTicks, ry], [volTicks, vy]]) {
+  const parts = [`<defs><linearGradient id="wash" gradientUnits="userSpaceOnUse" x1="0" x2="0" y1="${rateTop}" y2="${rateTop + rateH}">` +
+    `<stop offset="0" style="stop-color:var(--series);stop-opacity:0.28"/><stop offset="1" style="stop-color:var(--series);stop-opacity:0"/></linearGradient></defs>`];
+  for (const [ticks, y] of [[rates.ticks, ry], [volumes.ticks, vy]]) {
     for (const t of ticks) {
       parts.push(`<line x1="${m.left}" x2="${width - m.right}" y1="${y(t)}" y2="${y(t)}" stroke="${t ? "var(--grid)" : "var(--axis)"}" stroke-width="1" shape-rendering="crispEdges"/>`);
       parts.push(`<text class="tick" x="${m.left - 8}" y="${y(t) + 4}" text-anchor="end">${esc(number.format(t))}</text>`);
     }
   }
-  parts.push(`<text class="panel-title" x="${m.left}" y="${rateTop - 10}">Errors per page (${esc(number.format(settings.page))} characters)</text>`);
-  parts.push(`<text class="panel-title" x="${m.left}" y="${volTop - 10}">Reviewed pages</text>`);
+  parts.push(`<text class="panel-title" x="${m.left}" y="${volTop - 14}">Reviewed pages</text>`);
+  if (!lines.length) parts.push(`<text class="panel-title" x="${m.left + plotW / 2}" y="${rateTop + rateH / 2}" text-anchor="middle">Select a line or an error type to plot it.</text>`);
 
   // Axis labels, anchored on the latest period and thinned to avoid collisions.
   const every = Math.max(1, Math.ceil((settings.group === "month" ? 76 : narrow ? 56 : 64) / col));
@@ -482,44 +554,51 @@ function renderChart() {
     parts.push(`<text class="tick" x="${cx(i)}" y="${volTop + volH + 18}" text-anchor="middle">${esc(periodLabel(periods[i], false))}</text>`);
   }
 
-  // Volume bars: <= 24px wide, rounded data end, square on the baseline.
+  // Volume bars are context, so they stay neutral: <= 24px wide, rounded data end, square on the baseline.
   const barW = Math.max(1, Math.min(24, col - 2));
   periods.forEach((p, i) => {
     const y = vy(p.pages);
-    parts.push(`<path data-bar="${i}" d="${roundedTop(cx(i) - barW / 2, y, barW, volTop + volH - y, 4)}" fill="var(--bar)"/>`);
+    parts.push(`<path data-bar="${i}" d="${roundedTop(cx(i) - barW / 2, y, barW, volTop + volH - y, 3)}" fill="var(--bar)"/>`);
   });
 
   const labels = [];
   if (overall != null) {
-    parts.push(`<line x1="${m.left}" x2="${width - m.right}" y1="${ry(overall)}" y2="${ry(overall)}" stroke="var(--text-2)" stroke-width="1.5" stroke-dasharray="1.5 3.5" stroke-linecap="round"/>`);
+    parts.push(`<line x1="${m.left}" x2="${width - m.right}" y1="${ry(overall)}" y2="${ry(overall)}" stroke="var(--muted)" stroke-width="1.5" stroke-dasharray="1.5 4" stroke-linecap="round"/>`);
     labels.push({ y: ry(overall), text: narrow ? rateText(overall) : `avg ${rateText(overall)}`, cls: "ref-label" });
   }
 
-  // One line per visible series, the headline lines drawn last so they stay on top; empty periods break a line.
-  const isolatedIn = (rates, i) => (i === 0 || rates[i - 1] == null) && (i === n - 1 || rates[i + 1] == null);
+  // One line per visible series, the headline lines drawn last so they stay on top; empty periods break a line into runs.
+  const washes = [], strokes = [], markers = [];
   for (const series of [...lines].reverse()) {
-    const rates = periods.map((p) => p.rates[series.key]);
-    let path = "";
-    rates.forEach((v, i) => {
+    const values = periods.map((p) => p.rates[series.key]);
+    const runs = [];
+    values.forEach((v, i) => {
       if (v == null) return;
-      path += `${i && rates[i - 1] != null ? "L" : "M"}${cx(i).toFixed(1)},${ry(v).toFixed(1)}`;
+      if (i && values[i - 1] != null) runs[runs.length - 1].push([cx(i), ry(v)]);
+      else runs.push([[cx(i), ry(v)]]);
     });
-    parts.push(`<path d="${path}" fill="none" stroke="${series.color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"${series.dash ? ` stroke-dasharray="${series.dash}"` : ""}/>`);
-    const last = rates.findLastIndex((v) => v != null);
-    rates.forEach((v, i) => {
+    const marker = ([x, y]) => markers.push(`<circle cx="${x}" cy="${y}" r="${series.dash ? 3.5 : 4}" fill="${series.dash ? "var(--surface)" : series.color}" stroke="${series.dash ? series.color : "var(--surface)"}" stroke-width="2"/>`);
+    for (const run of runs) {
       // Markers only where a line has no segment to show; hover adds the rest.
-      if (v == null || !(i === last || isolatedIn(rates, i))) return;
-      parts.push(`<circle cx="${cx(i)}" cy="${ry(v)}" r="${series.dash ? 3.5 : 4}" fill="${series.dash ? "var(--surface)" : series.color}" stroke="${series.dash ? series.color : "var(--surface)"}" stroke-width="2"/>`);
-    });
-    if (last >= 0) labels.push({ y: ry(rates[last]), text: rateText(rates[last]), cls: "direct", series });
+      if (run.length === 1) { marker(run[0]); continue; }
+      const d = "M" + run.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join("L");
+      if (series.key === "all") washes.push(`<path d="${d}L${run[run.length - 1][0].toFixed(1)},${ry(0)}L${run[0][0].toFixed(1)},${ry(0)}Z" fill="url(#wash)"/>`);
+      strokes.push(`<path d="${d}" fill="none" stroke="${series.color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"${series.dash ? ` stroke-dasharray="${series.dash}"` : ""}/>`);
+    }
+    const last = runs[runs.length - 1];
+    if (!last) continue;
+    if (last.length > 1) marker(last[last.length - 1]);
+    labels.push({ y: last[last.length - 1][1], text: rateText(values.findLast((v) => v != null)), cls: "direct", series });
   }
-  // Latest values in the right margin, nudged apart so they never overlap.
+  parts.push(...washes, ...strokes, ...markers);
+
+  // Latest values in the right margin, nudged apart so they never overlap: pushed down past the
+  // label above, then back up from the baseline, so only crowded labels leave their line's end.
   labels.sort((a, b) => a.y - b.y);
   for (let i = 1; i < labels.length; i++) labels[i].y = Math.max(labels[i].y, labels[i - 1].y + 14);
-  const overflow = labels.length ? labels[labels.length - 1].y - (rateTop + rateH) : 0;
-  if (overflow > 0) for (const label of labels) label.y = Math.max(rateTop, label.y - overflow);
+  for (let i = labels.length - 1, limit = rateTop + rateH; i >= 0; limit = labels[i].y - 14, i--) labels[i].y = Math.min(labels[i].y, limit);
   for (const label of labels) {
-    const x = width - m.right + 8;
+    const x = width - m.right + 10;
     if (label.series) {
       parts.push(`<line x1="${x}" x2="${x + 10}" y1="${label.y}" y2="${label.y}" stroke="${label.series.color}" stroke-width="2"${label.series.dash ? ` stroke-dasharray="3 2"` : ""}/>`);
     }
@@ -571,13 +650,13 @@ function showTooltip(p, x, y) {
   const hosts = settings.source === "all"
     ? `<dt>Pi · Claude</dt><dd>${esc(number.format(p.pi))} · ${esc(number.format(p.claude))}</dd>` : "";
   const rows = geometry.lines.map((series) =>
-    `<dt><span class="ln${series.dash ? " dashed" : ""}" style="--c:${series.color}"></span>${esc(series.label)}</dt><dd>${p.rate == null ? "–" : esc(rateText(p.rates[series.key]))}</dd>`);
-  tip.innerHTML = `<div class="date">${esc(periodLabel(p, true))}</div><dl>
-    ${p.rate == null ? "<dt>No reviews</dt><dd></dd>" : rows.length ? `<dt class="muted">Errors per page</dt><dd></dd>${rows.join("")}<hr>` : ""}
+    `<dt><span class="ln${series.dash ? " dashed" : ""}" style="--c:${series.color}"></span>${esc(series.label)}</dt><dd>${esc(rateText(p.rates[series.key]))}</dd>`);
+  tip.innerHTML = `<div class="date">${esc(periodLabel(p, true))}</div>` + (p.rate == null ? `<div class="none">No reviews</div>` : `<dl>
+    ${rows.length ? `<dt class="caption">Errors per page</dt>${rows.join("")}<hr>` : ""}
     <dt>Errors</dt><dd>${esc(number.format(p.errors))}</dd>
-    <dt><span class="sw" style="background:var(--bar)"></span>Pages</dt><dd>${esc(pagesText(p.pages))}</dd>
+    <dt><span class="sw"></span>Pages</dt><dd>${esc(pagesText(p.pages))}</dd>
     <dt>Characters</dt><dd>${esc(number.format(p.characters))}</dd>
-    <dt>Reviews</dt><dd>${esc(number.format(p.reviews))}</dd>${hosts}</dl>`;
+    <dt>Reviews</dt><dd>${esc(number.format(p.reviews))}</dd>${hosts}</dl>`);
   tip.hidden = false;
   const svg = $("#chart svg");
   const scale = svg.getBoundingClientRect().width / geometry.width;
@@ -588,11 +667,14 @@ function showTooltip(p, x, y) {
   let left = left0 + 14;
   if (left + tip.offsetWidth > card.width - 8) left = left0 - 14 - tip.offsetWidth;
   tip.style.left = `${Math.max(8, left)}px`;
-  tip.style.top = `${Math.max(8, Math.min(top0 - tip.offsetHeight / 2, card.height - tip.offsetHeight - 8))}px`;
+  // Stay over the chart, clear of the figures above it, whenever the tooltip fits there.
+  const lowest = card.height - tip.offsetHeight - 8;
+  const highest = Math.max(8, Math.min(chart.top - card.top, lowest));
+  tip.style.top = `${Math.max(highest, Math.min(top0 - tip.offsetHeight / 2, lowest))}px`;
 }
 function hideTooltip() { $("#tooltip").hidden = true; }
 
-// ---- Text, tiles and table.
+// ---- Text, figures and table.
 function tableColumns() {
   const columns = [
     ["Period", "period", (p) => periodLabel(p, true)],
@@ -618,18 +700,20 @@ function renderText() {
   const t = current?.totals;
   $("#t-rate").textContent = t ? rateText(t.rate) : "–";
   $("#t-nospell").textContent = t ? rateText(t.rates.nospell) : "–";
-  $("#t-nospell-note").textContent = t && t.errors ? `spelling is ${percent.format(t.types.spelling / t.errors)} of errors` : "\u00a0";
+  $("#t-nospell-note").textContent = t && t.errors ? `spelling is ${percent.format(t.types.spelling / t.errors)} of errors` : " ";
   $("#t-reviews").textContent = t ? number.format(t.reviews) : "–";
   $("#t-hosts").textContent = t && s.source === "all" ? `Pi ${number.format(t.pi)} · Claude ${number.format(t.claude)}` : `${HOST_NAMES[s.source]} only`;
   $("#t-pages").textContent = t ? pagesText(t.pages) : "–";
   $("#t-chars").textContent = t ? `${number.format(t.characters)} characters` : " ";
   $("#t-errors").textContent = t ? number.format(t.errors) : "–";
+  const sameYear = current && current.start.slice(0, 4) === current.end.slice(0, 4);
   $("#subtitle").textContent = current
-    ? `${HOST_NAMES[s.source]} reviews, ${fmt(current.start, { year: "numeric", month: "short", day: "numeric" })} – ${fmt(current.end, { year: "numeric", month: "short", day: "numeric" })} (${data.timezone}) · 1 page = ${number.format(s.page)} characters`
+    ? `${HOST_NAMES[s.source]} reviews · ${fmt(current.start, { year: sameYear ? undefined : "numeric", month: "short", day: "numeric" })} – ${fmt(current.end, { year: "numeric", month: "short", day: "numeric" })} · ${data.timezone}`
     : `${HOST_NAMES[s.source]} reviews`;
 
-  renderLegend();
-  renderTypes();
+  const shown = new Set(s.lines.split(","));
+  for (const chip of document.querySelectorAll("#figures [data-line]")) chip.setAttribute("aria-pressed", shown.has(chip.dataset.line));
+  renderTypes(shown);
 
   const columns = tableColumns();
   $("#table-head").innerHTML = `<tr>${columns.map(([label]) => `<th scope="col">${esc(label)}</th>`).join("")}</tr>`;
@@ -646,32 +730,28 @@ function renderText() {
   alert.querySelector("ul").innerHTML = data.errors.map((e) => `<li>${esc(e)}</li>`).join("");
 }
 
-function renderLegend() {
-  const shown = new Set(settings.lines.split(","));
-  const chip = (series) => `<button type="button" class="chip" data-line="${series.key}" aria-pressed="${shown.has(series.key)}" style="--c:${series.color}">` +
-    `<i class="key${series.dash ? " dashed" : ""}" aria-hidden="true"></i>${esc(series.label)}</button>`;
-  $("#legend").innerHTML = SERIES.filter((series) => !series.type).map(chip).join("") + `<i class="sep" aria-hidden="true"></i>` +
-    SERIES.filter((series) => series.type).map(chip).join("");
-}
-
-function renderTypes() {
+function renderTypes(shown) {
   const t = current?.totals;
   const host = $("#types");
   if (!t || !t.characters) { host.innerHTML = ""; $("#types-hint").textContent = "No reviews in this range."; return; }
-  $("#types-hint").textContent = "Errors per page in the selected range. Select a type to plot it.";
-  const shown = new Set(settings.lines.split(","));
+  $("#types-hint").textContent = "Select a type to plot its line.";
+  const focused = host.contains(document.activeElement) ? document.activeElement.dataset.line : null;
   const types = SERIES.filter((series) => series.type).sort((a, b) => t.types[b.key] - t.types[a.key]);
   const max = Math.max(...types.map((series) => t.rates[series.key]), 1e-9);
-  host.innerHTML = `<div class="head">Type</div><div class="head"></div><div class="head num">Errors / page</div><div class="head num">Errors</div><div class="head num share">Share</div>` +
+  host.innerHTML = `<div class="type-head" aria-hidden="true"><span>Type</span><span class="num">Per page</span><span class="num">Errors</span><span class="num">Share</span></div>` +
     types.map((series) => {
       const count = t.types[series.key], value = t.rates[series.key];
-      return `<div class="type-row" style="--c:${series.color}">
-        <button type="button" data-line="${series.key}" aria-pressed="${shown.has(series.key)}"><span class="box" aria-hidden="true"></span>${esc(series.label)}</button>
-        <div class="track" aria-hidden="true">${count ? `<div class="fill" style="width:${(value / max * 100).toFixed(2)}%"></div>` : ""}</div>
-        <div class="num${count ? "" : " muted"}">${esc(rateText(value))}</div>
-        <div class="num${count ? "" : " muted"}">${esc(number.format(count))}</div>
-        <div class="num share muted">${t.errors ? esc(percent.format(count / t.errors)) : "–"}</div></div>`;
+      const share = t.errors ? percent.format(count / t.errors) : "–";
+      return `<button type="button" class="type-row${count ? "" : " zero"}" data-line="${series.key}" aria-pressed="${shown.has(series.key)}" style="--c:${series.color}"
+          aria-label="${esc(`${series.label}: ${rateText(value)} errors per page, ${number.format(count)} errors, ${share} of all errors`)}">
+        <span class="name"><span class="box"></span>${esc(series.label)}</span>
+        <span class="num rate">${esc(rateText(value))}</span>
+        <span class="num count">${esc(number.format(count))}</span>
+        <span class="num share">${esc(share)}</span>
+        <span class="track">${count ? `<span class="fill" style="width:${(value / max * 100).toFixed(2)}%"></span>` : ""}</span></button>`;
     }).join("");
+  // Rebuilding the rows must not drop keyboard focus from the one just toggled.
+  if (focused) host.querySelector(`[data-line="${focused}"]`)?.focus();
 }
 
 function downloadCsv(event) {
@@ -718,8 +798,10 @@ function receive(snapshot) {
 
 // ---- Wiring.
 syncControls();
+syncReset();
 $("#controls").addEventListener("input", (event) => {
   const form = event.currentTarget;
+  sizePageInput();
   if (event.target.name === "page" && !form.page.checkValidity()) return;
   settings = normalize({ ...settings, range: form.range.value, group: form.group.value, source: form.source.value, page: form.page.value });
   saveSettings();
@@ -729,7 +811,7 @@ $("#controls").addEventListener("submit", (event) => event.preventDefault());
 $("#controls").page.addEventListener("blur", syncControls);
 $("#reset").addEventListener("click", () => { settings = { ...DEFAULTS }; syncControls(); saveSettings(); render(); });
 $("#download").addEventListener("click", downloadCsv);
-for (const id of ["#legend", "#types"]) {
+for (const id of ["#figures", "#types"]) {
   $(id).addEventListener("click", (event) => {
     const button = event.target.closest("[data-line]");
     if (button) toggleLine(button.dataset.line);
@@ -739,10 +821,11 @@ for (const id of ["#legend", "#types"]) {
 // Dark by default; the light theme is opt-in and remembered by this browser.
 function applyTheme(theme) {
   document.documentElement.dataset.theme = theme;
-  $("#theme").textContent = theme === "dark" ? "Light mode" : "Dark mode";
+  const label = theme === "dark" ? "Switch to light mode" : "Switch to dark mode";
+  $("#theme").title = label;
+  $("#theme").setAttribute("aria-label", label);
 }
-let theme = "dark";
-try { if (localStorage.getItem(THEME_KEY) === "light") theme = "light"; } catch {}
+let theme = document.documentElement.dataset.theme === "light" ? "light" : "dark";
 applyTheme(theme);
 $("#theme").addEventListener("click", () => {
   theme = theme === "dark" ? "light" : "dark";

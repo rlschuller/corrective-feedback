@@ -330,11 +330,12 @@ not needed when running `./dashboard.sh` directly.
 The page shows **errors per page**, where a page is 1,500 reviewed characters by default,
 next to the number of reviewed pages, totals, a table, and a CSV export of the current view.
 By default the chart draws two lines: all errors (solid) and errors excluding spelling
-(dashed). The chips above the chart, or the rows of **Errors by type** below it, add or remove
-a line per error type. Reviewers name categories freely, so the dashboard folds them into
+(dashed). The chips above the two headline figures show or hide those lines, and the rows of
+**Errors by type** beside the chart add or remove a line per error type. Reviewers name
+categories freely, so the dashboard folds them into
 spelling, grammar, prepositions, articles, punctuation & capitalization, idiom & word choice,
 word order, and other; a name that mentions several types counts as the first one it names.
-The page opens in dark mode; **Light mode** in the header switches it.
+The page opens in dark mode; the sun button in the header switches to light mode.
 
 Controls above the chart set:
 
